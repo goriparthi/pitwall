@@ -1,0 +1,11 @@
+#!/bin/sh
+# Minimal pkg-config for libusb-1.0 that links Homebrew's static libusb, so the macOS binary needs no libusb at runtime.
+PREFIX="${LIBUSB_PREFIX:-$(brew --prefix libusb 2>/dev/null || echo /opt/homebrew)}"
+for arg in "$@"; do
+  case "$arg" in
+    --cflags) printf -- '-I%s/include/libusb-1.0\n' "$PREFIX" ;;
+    --libs) printf -- '%s/lib/libusb-1.0.a -framework IOKit -framework CoreFoundation -framework Security\n' "$PREFIX" ;;
+    --modversion) echo 1.0.27 ;;
+    --exists|--atleast-pkgconfig-version*) exit 0 ;;
+  esac
+done

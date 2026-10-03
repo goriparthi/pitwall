@@ -1,0 +1,19 @@
+{
+  "server": { "host": "127.0.0.1", "port": 7788 },
+  "display": { "enabled": true, "transport": "us88", "rotation": 90, "fps": 6, "jpegQuality": 88, "brightness": 80 },
+  "led": { "enabled": true, "maxBrightness": 60, "workingGlow": true },
+  "ui": { "rotatePages": false, "rotateSeconds": 20, "completedHoldMinutes": 10, "layouts": ["balanced", "agents", "usage", "system"] },
+  "projects": [],
+  "actions": [
+    { "id": "terminal", "label": "Terminal", "hint": "Terminal here", "key": "t", "kind": "terminal",
+      "mac": { "app": "Terminal" }, "windows": { "app": "wt.exe" } },
+    { "id": "editor", "label": "Editor", "hint": "VS Code here", "key": "e", "kind": "open-app", "target": "{project.path}",
+      "mac": { "app": "Visual Studio Code" }, "windows": { "app": "%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\Code.exe" } },
+    { "id": "claude", "label": "Claude Code", "hint": "New session here", "key": "c", "kind": "terminal", "run": "claude",
+      "mac": { "app": "Terminal" }, "windows": { "app": "wt.exe" } },
+    { "id": "dashboard", "label": "Full dashboard", "hint": "Main monitor", "key": "d", "kind": "open-url", "url": "http://127.0.0.1:7788/?view=full" },
+    { "id": "processes", "label": "Processes", "hint": "All processes", "key": "a", "kind": "open-app",
+      "mac": { "app": "Activity Monitor" }, "windows": { "app": "taskmgr.exe" } }
+  ],
+  "layouts": []
+}
