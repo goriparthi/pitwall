@@ -113,6 +113,15 @@ func TestSnapshotStaleFailingAndReload(t *testing.T) {
 		t.Fatalf("failing source must not light: %+v", s)
 	}
 
+	// a changed command is due at once instead of waiting out the old interval
+	c.state["a"].next, c.state["a"].conf = now.Add(time.Hour), confKey(cfg.Ops.Sources[0])
+	cfg = &config.Config{Ops: config.Ops{Sources: []config.OpsSource{{ID: "a", Label: "A", Command: []string{"/y"}, IntervalSeconds: 60, TimeoutSeconds: 10}}}}
+	c.state["a"].running = true // keep tick from launching the fake command
+	c.tick(context.Background(), now)
+	if !c.state["a"].next.IsZero() {
+		t.Fatal("a changed command should reset the schedule")
+	}
+
 	cfg = &config.Config{}
 	c.tick(context.Background(), now)
 	if len(c.state) != 0 || c.Snapshot(now).Present {

@@ -193,6 +193,11 @@ type state struct {
 	src     Source
 	next    time.Time
 	running bool
+	conf    string // the source's command and timing; a change runs it again at once
+}
+
+func confKey(src config.OpsSource) string {
+	return fmt.Sprintf("%q %d %d", src.Command, src.IntervalSeconds, src.TimeoutSeconds)
 }
 
 // Collector polls every configured source on its own interval and follows config reloads.
@@ -235,6 +240,9 @@ func (c *Collector) tick(ctx context.Context, now time.Time) {
 			c.state[src.ID] = st
 		}
 		st.src.Label = src.Label
+		if k := confKey(src); k != st.conf {
+			st.conf, st.next = k, time.Time{}
+		}
 		if st.running || now.Before(st.next) {
 			continue
 		}
