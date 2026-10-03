@@ -145,6 +145,26 @@ func (s *Source) Limits() M {
 	}
 }
 
+// Ops mirrors the ops integration's shape: one pipeline with a warning on the message queue.
+func (s *Source) Ops() M {
+	n := time.Now()
+	item := func(key, label, status, value, detail string) M {
+		return M{"key": key, "label": label, "status": status, "value": value, "detail": detail}
+	}
+	return M{"present": true, "sources": []M{{
+		"id": "pipeline", "label": "Ingest pipeline", "status": "warn", "hasReading": true,
+		"asOf": n.Add(-90 * time.Second).UnixMilli(), "checkedAt": n.Add(-80 * time.Second).UnixMilli(), "lastOkAt": n.Add(-80 * time.Second).UnixMilli(),
+		"summary": "queue drain slower than usual", "failures": 0, "stale": false, "failing": false,
+		"items": []M{
+			item("ingest", "File ingest", "ok", "14 today", "last 6m ago"),
+			item("queue", "File queue", "ok", "2 pending", "oldest 1m"),
+			item("loader", "Loader", "ok", "1 running", "p95 pickup 40s"),
+			item("drain", "Queue drain", "warn", "2.4k waiting", "oldest 18m"),
+		},
+		"findings": []M{{"status": "warn", "text": "Message queue oldest item is 18m old (warn at 15m)"}},
+	}}}
+}
+
 // Snapshot returns system, claude and tools sections in the live shapes.
 func (s *Source) Snapshot() (system, claude, tools M) {
 	s.mu.Lock()

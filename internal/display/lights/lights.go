@@ -1,5 +1,5 @@
-// Package lights maps agent status to the LED ring: amber breathing while an agent waits, dim red on failure,
-// faint blue while working, otherwise off. The ring is turned off on exit so it never shows a stale alert.
+// Package lights maps state to the LED ring: amber breathing while an agent waits, dim red on an agent failure
+// or a critical ops reading, faint blue while working, otherwise off. The ring is turned off on exit so it never shows a stale alert.
 package lights
 
 import (
@@ -24,16 +24,22 @@ var (
 	blue  = ledring.RGB{40, 120, 255}
 )
 
-// Policy: waiting beats failed beats working; calm is off.
-func Policy(statuses []string, workingGlow bool) Signal {
+// Inputs is everything the LED policy weighs.
+type Inputs struct {
+	Statuses    []string // agent statuses
+	OpsCritical bool     // a fresh ops reading is critical
+}
+
+// Policy: waiting beats failed or ops critical beats working; calm is off.
+func Policy(in Inputs, workingGlow bool) Signal {
 	has := map[string]bool{}
-	for _, s := range statuses {
+	for _, s := range in.Statuses {
 		has[s] = true
 	}
 	switch {
 	case has["waiting"]:
 		return Signal{Mode: "breathe", Color: amber}
-	case has["failed"]:
+	case has["failed"] || in.OpsCritical:
 		return Signal{Mode: "solid", Color: red, Level: 0.4}
 	case workingGlow && has["working"]:
 		return Signal{Mode: "solid", Color: blue, Level: 0.12}
@@ -45,8 +51,8 @@ func scale(c ledring.RGB, k float64) ledring.RGB {
 	return ledring.RGB{byte(float64(c[0]) * k), byte(float64(c[1]) * k), byte(float64(c[2]) * k)}
 }
 
-// Run drives the ring until ctx ends. statuses is polled at 1 Hz; animation runs at 20 Hz only while breathing.
-func Run(ctx context.Context, cfg func() *config.Config, statuses func() []string, log *logx.Logger) {
+// Run drives the ring until ctx ends. inputs is polled at 1 Hz; animation runs at 20 Hz only while breathing.
+func Run(ctx context.Context, cfg func() *config.Config, inputs func() Inputs, log *logx.Logger) {
 	var ring *ledring.Ring
 	sig := Signal{Mode: "off"}
 	var last ledring.RGB
@@ -87,7 +93,7 @@ func Run(ctx context.Context, cfg func() *config.Config, statuses func() []strin
 			}
 			if now.Sub(lastPoll) >= time.Second {
 				lastPoll = now
-				next := Policy(statuses(), c.LED.WorkingGlow)
+				next := Policy(inputs(), c.LED.WorkingGlow)
 				if next.Mode != sig.Mode || next.Color != sig.Color {
 					log.Info("LED signal", map[string]any{"mode": next.Mode})
 				}

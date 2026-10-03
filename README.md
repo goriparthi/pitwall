@@ -60,6 +60,31 @@ Ollama shows which models are loaded. Codex, Cursor and Claude Desktop are only 
 
 Pitwall turns the RedLine integration on only when it finds RedLine on the machine: its `redline` command, or the files RedLine publishes for other tools (`~/.local/share/redline/usage-snapshot.json`, or the statusline feed `claude-usage.json`). It runs `redline status --json` once a minute, which reads what RedLine already saved and makes no network request. When RedLine isn't there, Pitwall hides the AI desk template, drops the limits widget from other templates, and shows no limits in the header. Set `"integrations": { "redline": "off" }` to turn it off even when RedLine is installed.
 
+### Ops watch is optional
+
+Pitwall can show the health of something you run, such as a data pipeline, from a status command you write. Pitwall runs the command on a timer, reads its JSON, and shows it on the Ops desk template with a status chip in the header. A fresh critical reading turns the LED ring red. Pitwall holds no credentials: the command signs in on its own (ssh agent, keychain) and must only read. Nothing ops related appears until you add a source.
+
+```json
+"ops": { "sources": [ { "id": "pipeline", "label": "Ingest pipeline",
+  "command": ["/Users/you/bin/pipeline-status", "--window", "30"],
+  "intervalSeconds": 120, "timeoutSeconds": 30 } ] }
+```
+
+The command is an argument list, never a shell line. `command[0]` must be an absolute path to an existing file that other users can't write to, and on Windows it can't be a batch or PowerShell script. Intervals run from 30 to 3600 seconds and the timeout from 5 to 120, below the interval. Up to 4 sources; the widget shows the first in full and the rest as one line each.
+
+The command prints one document on stdout:
+
+```json
+{ "schema": "pitwall.status/1",
+  "status": "ok",
+  "asOf": "2026-10-03T14:02:11Z",
+  "summary": "all clear",
+  "items": [ { "key": "queue", "label": "File queue", "status": "ok", "value": "12 pending", "detail": "oldest 2m" } ],
+  "findings": [ { "status": "warn", "text": "Oldest message is 18m old (warn at 15m)" } ] }
+```
+
+`status` is `ok`, `warn`, `crit` or `unknown`. Without it, exit codes 0, 1 and 2 mean ok, warn and crit. `asOf` defaults to when the command ran. The panel shows the first 4 items and the first 2 findings that aren't ok. Keep `value` short (about 12 characters) and put words in `detail`. Any other exit code, a timeout, more than 64 KB of output, or output that isn't this JSON counts as a failed read, not a pipeline status: the last good reading stays up, dimmed and marked stale, and after three failed reads in a row the widget says there is no reading. A failed read never shows red or lights the LED. On timeout Pitwall stops the command and everything it started (on Windows, only the command itself). Stderr goes to the log, truncated, never to the panel. Privacy mode hides details, findings and the summary.
+
 ## How a dashboard fits together
 
 | Term | What it is |

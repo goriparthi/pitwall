@@ -26,10 +26,12 @@ import (
 
 	"github.com/goriparthi/pitwall/internal/collect/claude"
 	"github.com/goriparthi/pitwall/internal/collect/demo"
+	"github.com/goriparthi/pitwall/internal/collect/ops"
 	"github.com/goriparthi/pitwall/internal/collect/redline"
 	"github.com/goriparthi/pitwall/internal/collect/system"
 	"github.com/goriparthi/pitwall/internal/collect/tools"
 	"github.com/goriparthi/pitwall/internal/config"
+	"github.com/goriparthi/pitwall/internal/display/lights"
 	"github.com/goriparthi/pitwall/internal/launcher"
 	"github.com/goriparthi/pitwall/internal/logx"
 	"github.com/goriparthi/pitwall/web"
@@ -56,6 +58,7 @@ type Server struct {
 	Claude   *claude.Collector
 	Tools    *tools.Collector
 	Redline  *redline.Collector // nil when the integration is off
+	Ops      *ops.Collector
 	DemoSrc  *demo.Source
 	Launcher *launcher.Launcher
 	Shutdown func()
@@ -113,10 +116,15 @@ func (s *Server) Init() error {
 func (s *Server) Integrations() map[string]bool {
 	have := map[string]bool{}
 	if s.Demo {
-		have["redline"] = true
-	} else if s.Redline != nil {
+		for id := range config.IntegrationIDs {
+			have[id] = true
+		}
+		return have
+	}
+	if s.Redline != nil {
 		have["redline"] = s.Redline.Snapshot().Installed
 	}
+	have["ops"] = len(s.Cfg.Get().Ops.Sources) > 0
 	return have
 }
 
@@ -237,11 +245,17 @@ func (s *Server) Snapshot() M {
 		sys, cl, tl := s.DemoSrc.Snapshot()
 		out["mode"], out["system"], out["claude"], out["tools"] = "demo", sys, cl, tl
 		out["limits"] = s.DemoSrc.Limits()
+		out["ops"] = s.DemoSrc.Ops()
 	} else {
 		out["system"], out["claude"], out["tools"] = s.System.Snapshot(), s.Claude.Snapshot(), s.Tools.Snapshot()
 		if s.Redline != nil {
 			if l := s.Redline.Snapshot(); l.Installed {
 				out["limits"] = l
+			}
+		}
+		if s.Ops != nil {
+			if o := s.Ops.Snapshot(time.Now()); o.Present {
+				out["ops"] = o
 			}
 		}
 	}
@@ -537,6 +551,15 @@ func (s *Server) static(w http.ResponseWriter, p string) {
 }
 
 func (s *Server) Brightness() int { return s.UI().Brightness }
+
+// LightInputs is what the LED policy weighs; demo mode never lights the ring for ops.
+func (s *Server) LightInputs() lights.Inputs {
+	in := lights.Inputs{Statuses: s.Statuses()}
+	if !s.Demo && s.Ops != nil {
+		in.OpsCritical = s.Ops.Snapshot(time.Now()).Critical()
+	}
+	return in
+}
 
 // Statuses lists agent statuses for the LED policy.
 func (s *Server) Statuses() []string {

@@ -81,26 +81,42 @@ type Integrations struct {
 	Redline string `json:"redline"` // auto | off
 }
 
+// OpsSource is a read-only status command; the config is the allowlist and Pitwall holds no credentials.
+type OpsSource struct {
+	ID              string   `json:"id"`
+	Label           string   `json:"label"`
+	Command         []string `json:"command"` // argv, never a shell; command[0] is an absolute path
+	IntervalSeconds int      `json:"intervalSeconds"`
+	TimeoutSeconds  int      `json:"timeoutSeconds"`
+}
+
+type Ops struct {
+	Sources []OpsSource `json:"sources"`
+}
+
 type Config struct {
-	Server   Server    `json:"server"`
-	Display  Display   `json:"display"`
-	LED      LED       `json:"led"`
-	UI       UI        `json:"ui"`
-	Projects []Project `json:"projects"`
-	Actions  []Action  `json:"actions"`
+	Server       Server       `json:"server"`
+	Display      Display      `json:"display"`
+	LED          LED          `json:"led"`
+	UI           UI           `json:"ui"`
+	Projects     []Project    `json:"projects"`
+	Actions      []Action     `json:"actions"`
 	Layouts      []Layout     `json:"layouts"`
 	Integrations Integrations `json:"integrations"`
+	Ops          Ops          `json:"ops"`
 }
 
 var (
 	ActionKinds  = map[string]bool{"terminal": true, "open-app": true, "open-url": true}
 	ReservedKeys = map[string]bool{"f": true, "h": true, "r": true, "k": true}
-	Widgets      = map[string]bool{"ai": true, "health": true, "health-mini": true, "launcher": true, "usage": true, "system": true, "limits": true}
+	Widgets      = map[string]bool{"ai": true, "health": true, "health-mini": true, "launcher": true, "usage": true, "system": true, "limits": true, "ops": true}
 	// WidgetRequires names the integration a widget needs; its slot is dropped when that is absent.
-	WidgetRequires = map[string]string{"limits": "redline"}
-	keyRe        = regexp.MustCompile(`^[a-z]$`)
-	idRe         = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)
-	columnRe     = regexp.MustCompile(`^(\d{2,4}px|\d(\.\d+)?fr)$`)
+	WidgetRequires = map[string]string{"limits": "redline", "ops": "ops"}
+	// IntegrationIDs are the names a layout's "requires" may use.
+	IntegrationIDs = map[string]bool{"redline": true, "ops": true}
+	keyRe          = regexp.MustCompile(`^[a-z]$`)
+	idRe           = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)
+	columnRe       = regexp.MustCompile(`^(\d{2,4}px|\d(\.\d+)?fr)$`)
 )
 
 // StateDir holds token, logs, ui state and the hook event log.
@@ -242,10 +258,11 @@ func Parse(data []byte) (*Config, error) {
 				errs = append(errs, fmt.Sprintf("layout %s: unknown widget %q", l.ID, w))
 			}
 		}
-		if l.Requires != "" && l.Requires != "redline" {
-			errs = append(errs, fmt.Sprintf("layout %s: requires must be \"redline\" or empty", l.ID))
+		if l.Requires != "" && !IntegrationIDs[l.Requires] {
+			errs = append(errs, fmt.Sprintf("layout %s: requires must name an integration (redline, ops) or be empty", l.ID))
 		}
 	}
+	errs = append(errs, validateOps(&c.Ops)...)
 	if len(errs) > 0 {
 		return nil, errors.New(strings.Join(errs, "\n  "))
 	}
@@ -271,6 +288,65 @@ func applyDefaults(c *Config) {
 	if c.Integrations.Redline != "off" {
 		c.Integrations.Redline = "auto"
 	}
+}
+
+const maxOpsSources = 4
+
+// validateOps checks each status command: argv only, an absolute path to an existing file, never a script
+// the shell would interpret on Windows, and never writable by other users.
+func validateOps(o *Ops) []string {
+	var errs []string
+	if len(o.Sources) > maxOpsSources {
+		errs = append(errs, fmt.Sprintf("ops.sources: at most %d sources", maxOpsSources))
+	}
+	seen := map[string]bool{}
+	for i := range o.Sources {
+		src := &o.Sources[i]
+		name := fmt.Sprintf("ops source %d", i)
+		if !idRe.MatchString(src.ID) {
+			errs = append(errs, name+" needs a simple id")
+		} else {
+			name = "ops source " + src.ID
+		}
+		if seen[src.ID] {
+			errs = append(errs, "duplicate ops source id "+src.ID)
+		}
+		seen[src.ID] = true
+		if src.Label == "" {
+			src.Label = src.ID
+		}
+		src.IntervalSeconds = clamp(src.IntervalSeconds, 30, 3600, 120)
+		src.TimeoutSeconds = clamp(src.TimeoutSeconds, 5, 120, 30)
+		if src.TimeoutSeconds >= src.IntervalSeconds {
+			errs = append(errs, name+": timeoutSeconds must be below intervalSeconds")
+		}
+		if len(src.Command) == 0 {
+			errs = append(errs, name+": command is required")
+			continue
+		}
+		src.Command[0] = ExpandHome(src.Command[0])
+		exe := src.Command[0]
+		if !filepath.IsAbs(exe) {
+			errs = append(errs, name+": command[0] must be an absolute path")
+			continue
+		}
+		if runtime.GOOS == "windows" {
+			switch strings.ToLower(filepath.Ext(exe)) {
+			case ".bat", ".cmd", ".ps1":
+				errs = append(errs, name+": batch and PowerShell scripts are not allowed; point at an executable")
+			}
+		}
+		st, err := os.Stat(exe)
+		switch {
+		case err != nil:
+			errs = append(errs, name+": command not found: "+exe)
+		case !st.Mode().IsRegular():
+			errs = append(errs, name+": command is not a regular file: "+exe)
+		case runtime.GOOS != "windows" && st.Mode().Perm()&0o002 != 0:
+			errs = append(errs, name+": command is writable by every user; fix its permissions: "+exe)
+		}
+	}
+	return errs
 }
 
 func clamp(v, lo, hi, def int) int {

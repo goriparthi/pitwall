@@ -321,3 +321,29 @@ body.native-180 #stage { transform: translate(1920px, 480px) rotate(180deg); }
 .limchip .lc-ok { color: var(--text); }
 .limchip .lc-warn { color: var(--wait); }
 .limchip .lc-bad { color: var(--fail); }
+
+/* ---------- ops: read-only status commands ---------- */
+.ops { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.ops.is-stale { opacity: .55; }
+.op-tiles { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 12px; }
+.op { min-width: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+.op-k { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 17px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.op-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--idle); flex: none; }
+.op-v { font-size: 32px; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.op-d { font-size: 18px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 22px; }
+.op-f { flex: none; display: flex; align-items: center; gap: 8px; font-size: 18px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.op-f > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.op-ok .op-dot { background: var(--done); }
+.op-warn .op-dot { background: var(--wait); }
+.op-crit .op-dot { background: var(--fail); }
+.op.op-warn { border-color: color-mix(in srgb, var(--wait) 55%, transparent); }
+.op.op-crit { border-color: color-mix(in srgb, var(--fail) 60%, transparent); }
+.op-f.op-warn, .op-f.op-warn .ic { color: var(--wait); }
+.op-f.op-crit, .op-f.op-crit .ic { color: var(--fail); }
+.tag.op-ok { color: var(--done); border-color: color-mix(in srgb, var(--done) 45%, transparent); }
+.tag.op-warn { color: var(--wait); border-color: color-mix(in srgb, var(--wait) 45%, transparent); }
+.tag.op-crit { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 55%, transparent); }
+.op-c.op-ok { color: var(--text); }
+.op-c.op-warn { color: var(--wait); }
+.op-c.op-crit { color: var(--fail); }
+.op-c.op-unknown { color: var(--faint); }

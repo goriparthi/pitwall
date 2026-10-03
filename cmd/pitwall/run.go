@@ -8,6 +8,7 @@ import (
 
 	"github.com/goriparthi/pitwall/internal/collect/claude"
 	"github.com/goriparthi/pitwall/internal/collect/demo"
+	"github.com/goriparthi/pitwall/internal/collect/ops"
 	"github.com/goriparthi/pitwall/internal/collect/redline"
 	"github.com/goriparthi/pitwall/internal/collect/system"
 	"github.com/goriparthi/pitwall/internal/collect/tools"
@@ -48,6 +49,9 @@ func runCmd(args []string) int {
 			srv.Redline = &redline.Collector{}
 			srv.Redline.Start(ctx)
 		}
+		// always running: sources can be added by editing the config without a restart
+		srv.Ops = &ops.Collector{Cfg: store.Get, Log: log}
+		srv.Ops.Start(ctx)
 		srv.System.Start(ctx)
 		srv.Claude.Start(ctx)
 		srv.Tools.Start(ctx)
@@ -85,7 +89,7 @@ func runCmd(args []string) int {
 		}()
 		go func() {
 			defer wg.Done()
-			lights.Run(ctx, store.Get, srv.Statuses, dlog)
+			lights.Run(ctx, store.Get, srv.LightInputs, dlog)
 		}()
 	}
 

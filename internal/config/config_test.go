@@ -1,6 +1,10 @@
 package config
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -63,11 +67,50 @@ func TestForIntegrationsHidesWhatIsAbsent(t *testing.T) {
 	if _, ok := ids["ai-desk"]; ok {
 		t.Fatal("ai-desk requires redline and must be hidden without it")
 	}
+	if _, ok := ids["ops-desk"]; ok {
+		t.Fatal("ops-desk requires ops and must be hidden without a configured source")
+	}
 	if u := ids["usage"]; strings.Join(u.Slots, ",") != "usage" || strings.Join(u.Columns, ",") != "1fr" {
 		t.Fatalf("limits slot and its column should be dropped: %+v", u)
 	}
-	with := ForIntegrations(all, map[string]bool{"redline": true})
+	with := ForIntegrations(all, map[string]bool{"redline": true, "ops": true})
 	if len(with) != len(all) {
-		t.Fatal("everything is usable when redline is present")
+		t.Fatal("everything is usable when every integration is present")
+	}
+}
+
+func TestOpsSourceValidation(t *testing.T) {
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "status")
+	if err := os.WriteFile(exe, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	base := `{"ops":{"sources":[%s]}}`
+	ok := fmt.Sprintf(`{"id":"p","command":[%q,"--window","30"]}`, exe)
+	c, err := Parse([]byte(fmt.Sprintf(base, ok)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := c.Ops.Sources[0]; s.Label != "p" || s.IntervalSeconds != 120 || s.TimeoutSeconds != 30 {
+		t.Fatalf("defaults not applied: %+v", s)
+	}
+	bad := map[string]string{
+		"relative path":       `{"id":"p","command":["status"]}`,
+		"missing file":        fmt.Sprintf(`{"id":"p","command":[%q]}`, filepath.Join(dir, "nope")),
+		"no command":          `{"id":"p","command":[]}`,
+		"timeout >= interval": fmt.Sprintf(`{"id":"p","command":[%q],"intervalSeconds":30,"timeoutSeconds":60}`, exe),
+		"duplicate id":        ok + "," + ok,
+		"bad id":              fmt.Sprintf(`{"id":"a b","command":[%q]}`, exe),
+	}
+	if runtime.GOOS != "windows" {
+		ww := filepath.Join(dir, "open")
+		_ = os.WriteFile(ww, nil, 0o755)
+		_ = os.Chmod(ww, 0o757)
+		bad["world writable"] = fmt.Sprintf(`{"id":"p","command":[%q]}`, ww)
+	}
+	for name, src := range bad {
+		if _, err := Parse([]byte(fmt.Sprintf(base, src))); err == nil {
+			t.Errorf("%s: expected a validation error", name)
+		}
 	}
 }

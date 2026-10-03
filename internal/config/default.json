@@ -2,8 +2,9 @@
   "server": { "host": "127.0.0.1", "port": 7788 },
   "display": { "enabled": true, "transport": "us88", "rotation": 90, "fps": 6, "jpegQuality": 88, "brightness": 80 },
   "led": { "enabled": true, "maxBrightness": 60, "workingGlow": true },
-  "ui": { "rotatePages": false, "rotateSeconds": 20, "completedHoldMinutes": 10, "layouts": ["balanced", "ai-desk", "agents", "usage", "system"] },
+  "ui": { "rotatePages": false, "rotateSeconds": 20, "completedHoldMinutes": 10, "layouts": ["balanced", "ai-desk", "ops-desk", "agents", "usage", "system"] },
   "integrations": { "redline": "auto" },
+  "ops": { "sources": [] },
   "projects": [],
   "actions": [
     { "id": "terminal", "label": "Terminal", "hint": "Terminal here", "key": "t", "kind": "terminal",

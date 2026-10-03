@@ -283,6 +283,60 @@ function limitChip(s, now) {
   return `<span class="limchip">${icon('gauge', 18)}${part(by.five_hour, '5h')}${part(by.seven_day, 'wk')}</span>`;
 }
 
+// ---------------- Ops: read-only status commands ----------------
+const OPS_WORD = { ok: 'OK', warn: 'Warn', crit: 'Crit', unknown: 'Unknown' };
+
+function agoText(ms) {
+  return ms < 60000 ? 'just now' : `${untilText(ms)} ago`;
+}
+
+// A source with no trusted reading shows grey: a failed read is never red; red means the pipeline is in trouble.
+function opsState(src) {
+  if (!src.hasReading || src.failing) return 'unknown';
+  return src.stale ? 'unknown' : src.status;
+}
+
+export function renderOps(zone, s, now) {
+  const O = s.ops;
+  if (!O?.present || !O.sources?.length) return setHTML(zone, '');
+  const priv = s.ui.privacy;
+  const [src, ...others] = O.sources;
+  const st = opsState(src);
+  const old = src.stale || src.failing;
+  const tag = src.failing
+    ? '<span class="tag">No reading</span>'
+    : `<span class="tag op-${st}">${esc(OPS_WORD[st])}</span>${src.stale ? ' <span class="tag warn">stale</span>' : ''}`;
+  const read = !src.hasReading
+    ? src.error ? `no reading · ${esc(src.error)}` : 'waiting for the first reading'
+    : src.failing ? `${esc(src.error)} · last read ${agoText(now - src.asOf)}` : `read ${agoText(now - src.asOf)}`;
+  const head = `<div class="zone-head"><span class="eyebrow">${icon('activity', 18)}Ops</span>${tag}<span class="right"><b>${esc(src.label)}</b> · ${read}</span></div>`;
+  if (!src.hasReading) {
+    return setHTML(zone, `${head}<div class="lim-empty">${icon('activity', 28)}<div><b>No reading yet</b><br>${src.error ? `The status command failed: ${esc(src.error)}.` : 'The status command runs on its interval.'}</div></div>`);
+  }
+  const tiles = src.items.slice(0, 4).map((it) => `<div class="op op-${old ? 'unknown' : it.status}">
+      <span class="op-k"><span class="op-dot"></span>${esc(it.label)}</span>
+      <span class="op-v num">${esc(it.value)}</span>
+      <span class="op-d">${priv ? '' : esc(it.detail ?? '')}</span></div>`).join('');
+  const notes = src.findings.filter((f) => f.status !== 'ok').slice(0, 2);
+  const line = priv
+    ? ''
+    : notes.length
+      ? notes.map((f) => `<div class="op-f op-${old ? 'unknown' : f.status}">${icon('attention', 18)}<span>${esc(f.text)}</span></div>`).join('')
+      : src.summary ? `<div class="op-f">${icon('check', 18)}<span>${esc(src.summary)}</span></div>` : '';
+  const more = others.map((o) => `<div class="op-f op-${opsState(o)}"><span class="op-dot"></span><span>${esc(o.label)} · ${esc(OPS_WORD[opsState(o)])}</span></div>`).join('');
+  setHTML(zone, `${head}<div class="ops${old ? ' is-stale' : ''}"><div class="op-tiles">${tiles}</div>${line}${more}</div>`);
+}
+
+// Header chip on every template when ops is configured: the worst trusted status across sources.
+function opsChip(s) {
+  const srcs = s.ops?.present ? s.ops.sources ?? [] : [];
+  if (!srcs.length) return '';
+  const rank = { unknown: 0, ok: 1, warn: 2, crit: 3 };
+  const states = srcs.map(opsState);
+  const worst = states.includes('unknown') && !states.some((x) => x === 'warn' || x === 'crit') ? 'unknown' : states.reduce((a, b) => (rank[b] > rank[a] ? b : a), 'ok');
+  return `<span class="limchip">${icon('activity', 18)}<span class="op-c op-${worst}">Ops ${worst === 'unknown' ? '?' : OPS_WORD[worst]}</span></span>`;
+}
+
 // ---------------- Frame: header and footer ----------------
 export function renderHeader(el, s, now, agents, layout) {
   const proj = s.projects.find((p) => p.id === s.ui.project);
@@ -300,6 +354,7 @@ export function renderHeader(el, s, now, agents, layout) {
   }
   const ds = s.display?.state;
   const meta = [
+    opsChip(s),
     limitChip(s, now),
     s.mode === 'demo' ? '<span class="demo">Demo data</span>' : '<span>Live</span>',
     ds && !['streaming', 'unknown', 'stopped'].includes(ds) ? `<span class="warn">Panel ${esc(ds)}</span>` : '',
@@ -369,6 +424,7 @@ export const WIDGETS = {
   health: (el, c) => renderHealth(el, c.state, c.now),
   'health-mini': (el, c) => renderHealthMini(el, c.state),
   limits: (el, c) => renderLimits(el, c.state, c.now),
+  ops: (el, c) => renderOps(el, c.state, c.now),
   launcher: (el, c) => renderLaunch(el, c.state, c.now, c.flash),
   usage: (el, c) => renderUsage(el, c.state, c.agents),
   system: (el, c) => renderSystem(el, c.state),
