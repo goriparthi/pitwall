@@ -109,11 +109,11 @@ function renderCards(host, agents, now, slots) {
 
 export function renderAI(zone, s, agents, now, width = 868) {
   if (!zone.__built) {
-    zone.innerHTML = '<div class="zone-head"><span class="eyebrow">AI operations</span><div class="counts"></div><span class="right"></span></div><div class="attention" hidden></div><div class="cards"></div><div class="strip"></div>';
+    zone.innerHTML = '<div class="zone-head"><span class="eyebrow">Agents</span><div class="counts"></div><span class="right"></span></div><div class="cards"></div>';
     zone.__built = true;
   }
   const counts = { waiting: 0, working: 0, failed: 0, completed: 0, idle: 0 };
-  for (const a of s.claude?.agents ?? []) counts[a.status] = (counts[a.status] ?? 0) + 1;
+  for (const a of agents) counts[a.status] = (counts[a.status] ?? 0) + 1;
   setHTML(
     zone.querySelector('.counts'),
     ['waiting', 'working', 'failed', 'completed', 'idle']
@@ -124,39 +124,19 @@ export function renderAI(zone, s, agents, now, width = 868) {
   const t = s.claude?.today;
   setHTML(zone.querySelector('.zone-head .right'), t ? `today <span class="mono">${t.turns}</span> turns · <span class="mono">${tokens(t.output)}</span> out` : '');
 
-  // Attention banner: approvals and failures only; completions are counted, not shouted.
-  const banner = zone.querySelector('.attention');
-  const urgent = agents.filter((a) => a.status === 'waiting' || a.status === 'failed');
-  if (urgent.length) {
-    const a = urgent[0];
-    const failed = a.status === 'failed';
-    banner.className = `attention${failed ? ' failed' : ''}`;
-    const what = failed ? `failed · ${String(a.error ?? 'error').replaceAll('_', ' ')}` : `${WAIT_TEXT[a.wait?.kind] ?? 'is waiting for you'}${a.wait?.tool ? ` · ${a.wait.tool}` : ''}`;
-    setHTML(banner, `<span class="glyph">${failed ? '✕' : '▲'}</span><strong>${esc(a.name ?? a.project ?? 'Claude Code')}</strong><span class="what">${esc(what)}</span><span class="num">${duration(now - (a.since ?? now))}</span>${urgent.length > 1 ? `<span class="more">+${urgent.length - 1} more</span>` : ''}`);
-    banner.hidden = false;
-  } else banner.hidden = true;
-
   const cards = zone.querySelector('.cards');
-  // as many ~280px cards as the slot holds (3 in the balanced layout, 4 in the wide ones)
-  const slots = Math.max(1, Math.min(6, Math.floor((width - 24) / 280)));
+  // as many ~270px cards as the slot holds (3 in the balanced layout, 4 in the wide ones)
+  const slots = Math.max(1, Math.min(6, Math.floor((width + 16) / 286)));
   cards.style.gridTemplateColumns = `repeat(${slots}, minmax(0, 1fr))`;
   if (!agents.length) {
     renderCards(cards, [], now, slots);
     const e = document.createElement('div');
     e.className = 'card empty';
     e.innerHTML = s.ui.focus
-      ? '<div class="big">Nothing active</div><div>Focus mode shows working, waiting and failed sessions only.</div>'
-      : `<div class="big">No Claude Code sessions${s.ui.project !== 'all' ? ' in this project' : ''}</div><div>Start one from the launcher (C) or any terminal.</div>`;
+      ? '<div class="big">Nothing active</div><div>Focus shows working, waiting and failed sessions.</div>'
+      : `<div class="big">No Claude Code sessions${s.ui.project !== 'all' ? ' in this project' : ''}</div><div>Start one from the launcher or any terminal.</div>`;
     cards.appendChild(e);
   } else renderCards(cards, agents, now, slots);
-
-  const tools = (s.tools?.tools ?? []).map((x) => `<span class="tool"><span class="dot ${x.status === 'loaded' ? 's-working' : ''}"></span><b>${esc(x.label)}</b>${esc(x.detail)}</span>`);
-  const feed = s.ui.focus ? [] : (s.claude?.feed ?? []).slice(0, tools.length > 1 ? 1 : 2).map((f) => {
-    const a = agents.find((x) => x.id === f.sessionId) ?? (s.claude?.agents ?? []).find((x) => x.id === f.sessionId);
-    const who = s.ui.privacy ? 'session' : a?.name ?? a?.project ?? 'session';
-    return `<span class="ev"><span class="t mono">${clock(f.at)}</span>${esc(who)} · ${esc(f.text)}</span>`;
-  });
-  setHTML(zone.querySelector('.strip'), [...tools, ...(tools.length && feed.length ? ['<span class="sep"></span>'] : []), `<span class="feed">${feed.join('')}</span>`].join(''));
 }
 
 // ---------------- Health zone ----------------
@@ -185,64 +165,90 @@ export function renderHealthMini(zone, s) {
 export function renderHealth(zone, s, now) {
   const sys = s.system ?? {};
   const h = sys.history ?? {};
-  const self = sys.self?.value != null ? `dashboard <span class="mono">${sys.self.value.toFixed(1)}%</span> · <span class="mono">${bytes(sys.self.rssBytes, 0)}</span>` : '';
   const cpu = tile('cpu', 'CPU', sys.cpu, now, `${Math.round(sys.cpu?.value)}<small>%</small>`,
-    spark(h.cpu, { max: 100, color: 'var(--work)', id: 'cpu' }),
+    spark(h.cpu, { max: 100, color: 'var(--pw-accent)', id: 'cpu' }),
     `load <span class="mono">${sys.cpu?.load?.[0]?.toFixed(2) ?? 'n/a'}</span> · ${sys.cores ?? '?'} cores`);
   const mem = tile('mem', 'Memory', sys.mem, now, `${Math.round(sys.mem?.value)}<small>%</small>`,
-    spark(h.mem, { max: 100, color: 'var(--mem)', id: 'mem' }),
+    spark(h.mem, { max: 100, color: 'var(--muted)', id: 'mem' }),
     `<span class="mono">${gib(sys.mem?.used)}</span> of <span class="mono">${gib(sys.mem?.total, 0)}</span>${sys.mem?.swapBytes > 5e8 ? ` · swap <span class="mono">${gib(sys.mem.swapBytes)}</span>` : ''}`);
   const disk = tile('disk', 'Disk free', sys.disk, now, bytes(sys.disk?.freeBytes, 0).replace(' ', '<small>') + '</small>',
-    `<div class="bar"><i style="width:${Math.round(sys.disk?.value ?? 0)}%;background:var(--disk)"></i></div>`,
+    `<div class="bar"><i style="width:${Math.round(sys.disk?.value ?? 0)}%;background:var(--muted)"></i></div>`,
     `of <span class="mono">${bytes(sys.disk?.totalBytes, 0)}</span> · <span class="mono">${Math.round(sys.disk?.value)}%</span> used`);
   const net = tile('net', 'Network', sys.net, now,
-    `<span class="nr"><span class="ar" style="color:var(--net-rx)">↓</span>${rate(sys.net?.rxBps)}</span><span class="nr tx"><span class="ar" style="color:var(--net-tx)">↑</span>${rate(sys.net?.txBps)}</span>`,
-    spark(h.netRx, { color: 'var(--net-rx)', id: 'rx' }) + spark(h.netTx, { color: 'var(--net-tx)', id: 'tx', fill: false, max: Math.max(...(h.netRx ?? [1]), ...(h.netTx ?? [1]), 1) }),
+    `<span class="nr"><span class="ar" style="color:var(--work)">↓</span>${rate(sys.net?.rxBps)}</span><span class="nr tx"><span class="ar" style="color:var(--faint)">↑</span>${rate(sys.net?.txBps)}</span>`,
+    spark(h.netRx, { color: 'var(--work)', id: 'rx' }) + spark(h.netTx, { color: 'var(--faint)', id: 'tx', fill: false, max: Math.max(...(h.netRx ?? [1]), ...(h.netTx ?? [1]), 1) }),
     '');
-  const procs = staleness(sys.procs, now) === 'fresh' || staleness(sys.procs, now) === 'stale'
-    ? (sys.procs.value ?? []).slice(0, 3).map((p) => `<div class="proc"><span class="n">${esc(p.name)}</span><span class="c num">${p.cpu.toFixed(0)}%</span><span class="m num">${bytes(p.rssBytes, 0)}</span></div>`).join('')
-    : '<div class="proc"><span class="n" style="color:var(--faint)">processes unavailable</span></div>';
-  const chip = (label, m, fmt) => {
-    const st = staleness(m, now);
-    if (st === 'unavailable' || st === 'missing' || m?.value == null) return `<div class="chip na">${label}<b>${esc(m?.unavailable ?? 'n/a')}</b></div>`;
-    return `<div class="chip">${label}<b>${fmt(m)}</b></div>`;
-  };
-  setHTML(zone, `<div class="zone-head"><span class="eyebrow">Computer · ${esc(s.ui.privacy ? 'this Mac' : sys.host ?? '')}</span><span class="right">${self}</span></div>
-    <div class="tiles">${cpu}${mem}${net}${disk}</div>
-    <div class="health-foot"><div class="procs">${procs}</div><div class="chips">
-      ${chip('GPU', sys.gpu, (m) => `${Math.round(m.value)}%`)}
-      ${chip('Battery', sys.battery, (m) => `${m.percent}% ${m.source === 'ac' ? '⚡' : m.remaining ?? ''}`)}
-      ${chip('Thermal', sys.thermal, (m) => esc(m.value))}
-    </div></div>`);
+  const extra = [];
+  if (sys.gpu?.value != null) extra.push(`GPU <span class="mono">${Math.round(sys.gpu.value)}%</span>`);
+  if (sys.battery?.value != null) extra.push(`Battery <span class="mono">${sys.battery.percent}%</span>${sys.battery.source === 'ac' ? ' ⚡' : ''}`);
+  if (sys.thermal?.value && sys.thermal.value !== 'nominal') extra.push(`<span style="color:var(--wait)">Thermal ${esc(sys.thermal.value)}</span>`);
+  setHTML(zone, `<div class="zone-head"><span class="eyebrow">${esc(s.ui.privacy ? 'This computer' : sys.host ?? 'This computer')}</span><span class="right">${extra.join(' · ')}</span></div>
+    <div class="tiles">${cpu}${mem}${net}${disk}</div>`);
 }
 
 // ---------------- Launcher zone ----------------
 export function renderLaunch(zone, s, now, flash) {
   const proj = s.projects.find((p) => p.id === s.ui.project);
-  const d = new Date(now);
-  const modeTag = s.mode === 'demo' ? '<span class="tag demo">Demo data</span>' : '<span class="tag live">Live</span>';
-  const ds = s.display?.state;
-  const dispTag = ds === 'streaming' ? '<span class="tag">Panel on</span>' : ds && ds !== 'unknown' ? `<span class="tag warn">Panel ${esc(ds)}</span>` : '';
   const projName = proj ? (s.ui.privacy ? 'Project hidden' : proj.name) : 'All projects';
   const actions = (s.actions ?? []).slice(0, 6).map((a) => `<button class="action${flash?.id === a.id ? (flash.ok ? ' flash' : ' flash-bad') : ''}" data-action="${esc(a.id)}"><span class="kb">${esc((a.key ?? '').toUpperCase())}</span><span class="lab">${esc(a.label)}</span><span class="hint">${esc(a.hint ?? '')}</span></button>`).join('');
-  const pages = (s.pageOrder ?? []).map((p) => `<i class="${s.ui.page === p && !s.ui.focus ? 'on' : ''}"></i>`).join('');
-  setHTML(zone, `<div class="clock"><span class="time num">${clock(now)}</span><span class="date">${d.toLocaleDateString([], { weekday: 'short' })}<br>${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span><span class="badges">${modeTag}${dispTag}</span></div>
-    <div class="project"><span class="lbl">Project</span><span class="pn">${esc(projName)}</span><span class="kb">[ ]</span></div>
-    <div class="actions">${actions}</div>
-    <div class="modes"><span class="mode${s.ui.focus ? ' on' : ''}">Focus F</span><span class="mode${s.ui.privacy ? ' on' : ''}">Private H</span><span class="mode${s.ui.rotate ? ' on' : ''}">Rotate R</span><span class="pages">${pages}</span></div>`);
+  setHTML(zone, `<div class="zone-head"><span class="eyebrow">Launch</span><span class="right">in <b>${esc(projName)}</b></span></div>
+    <div class="actions">${actions}</div>`);
+}
+
+// ---------------- Frame: header and footer ----------------
+export function renderHeader(el, s, now, agents, layout) {
+  const proj = s.projects.find((p) => p.id === s.ui.project);
+  const scope = proj ? (s.ui.privacy ? 'Project hidden' : proj.name) : 'All projects';
+  const urgent = agents.filter((a) => a.status === 'waiting' || a.status === 'failed');
+  let center;
+  if (urgent.length) {
+    // the attention pill replaces the workspace title; approvals and failures only, completions are counted, not shouted
+    const a = urgent[0];
+    const failed = a.status === 'failed';
+    const what = failed ? `failed · ${String(a.error ?? 'error').replaceAll('_', ' ')}` : `${WAIT_TEXT[a.wait?.kind] ?? 'is waiting for you'}${a.wait?.tool ? ` · ${a.wait.tool}` : ''}`;
+    center = `<div class="pill${failed ? ' failed' : ''}"><span>${failed ? '✕' : '▲'}</span><b>${esc(a.name ?? a.project ?? 'Claude Code')}</b><span>${esc(what)}</span>${urgent.length > 1 ? `<span class="more">+${urgent.length - 1} more</span>` : ''}<span class="num">${duration(now - (a.since ?? now))}</span></div>`;
+  } else {
+    center = `<div class="title">${esc(layout?.name ?? 'Overview')} <span class="scope">/ ${esc(scope)}</span></div>`;
+  }
+  const ds = s.display?.state;
+  const meta = [
+    s.mode === 'demo' ? '<span class="demo">Demo data</span>' : '<span>Live</span>',
+    ds && !['streaming', 'unknown', 'stopped'].includes(ds) ? `<span class="warn">Panel ${esc(ds)}</span>` : '',
+    `<span class="clock">${clock(now)}</span>`,
+  ].filter(Boolean).join('<span>·</span>');
+  setHTML(el, `<img class="wordmark" src="/brand/lockup-light.svg" alt="pitwall">${center}<div class="meta">${meta}</div>`);
+}
+
+export function renderFooter(el, s, agents) {
+  const names = Object.fromEntries((s.layouts ?? []).map((l) => [l.id, l.name]));
+  const tabs = (s.pageOrder ?? []).map((id, i) => `<span class="tab${s.ui.page === id && !s.ui.focus ? ' on' : ''}"><span class="n">${String(i + 1).padStart(2, '0')}</span>${esc(names[id] ?? id)}</span>`).join('');
+  const flags = [s.ui.focus && 'Focus', s.ui.privacy && 'Private', s.ui.rotate && 'Rotating'].filter(Boolean).map((f) => `<span class="flag">${f}</span>`).join('');
+  const waiting = agents.filter((a) => a.status === 'waiting').length;
+  const failed = agents.filter((a) => a.status === 'failed').length;
+  let right;
+  if (waiting || failed) {
+    const parts = [waiting && `${waiting} agent${waiting > 1 ? 's' : ''} need${waiting > 1 ? '' : 's'} you`, failed && `${failed} failed`].filter(Boolean);
+    right = `<span class="right ${waiting ? 'hot' : 'bad'}">${parts.join(' · ')}</span>`;
+  } else {
+    const f = (s.claude?.feed ?? [])[0];
+    const a = f && (s.claude?.agents ?? []).find((x) => x.id === f.sessionId);
+    const who = s.ui.privacy ? 'session' : a?.name ?? a?.project ?? 'session';
+    right = f ? `<span class="right"><span class="t">${clock(f.at)}</span>${esc(who)} · ${esc(f.text)}</span>` : '<span class="right">All clear</span>';
+  }
+  setHTML(el, `${tabs}${flags}${right}`);
 }
 
 // ---------------- Secondary pages ----------------
 export function renderUsage(zone, s, agents) {
   const t = s.claude?.today ?? {};
   const rows = agents.filter((a) => a.usage).slice(0, 6).map((a) => `<tr><td><span class="dot s-${a.status}" style="display:inline-block;margin-right:10px"></span>${esc(a.name ?? a.project)}</td><td>${esc((a.usage.model ?? '').replace('claude-', ''))}</td><td class="r num">${tokens(a.usage.contextTokens)}</td><td class="r num">${tokens(a.usage.inputTokens)}</td><td class="r num">${tokens(a.usage.outputTokens)}</td><td class="r num">${a.usage.turns}</td></tr>`).join('');
-  setHTML(zone, `<div class="zone-head"><span class="eyebrow">AI usage · today</span><span class="right">measured from Claude Code transcripts · cost not shown (no reliable local source)</span></div>
+  setHTML(zone, `<div class="zone-head"><span class="eyebrow">AI usage · today</span><span class="right">${(s.tools?.tools ?? []).map((x) => `${esc(x.label)}: ${esc(x.detail)}`).join(' · ') || 'measured from Claude Code transcripts · cost not shown'}</span></div>
     <div class="usage-grid"><div class="bigstats">
       <div class="bigstat"><span class="k">Output tokens</span><span class="v num">${tokens(t.output)}</span><span class="s">all sessions today</span></div>
       <div class="bigstat"><span class="k">Input tokens</span><span class="v num">${tokens(t.input)}</span><span class="s">incl. cache reads</span></div>
       <div class="bigstat"><span class="k">Turns done</span><span class="v num">${t.turns ?? 0}</span><span class="s">${t.hookCompletions ?? 0} via hooks</span></div>
       <div class="bigstat"><span class="k">Sessions</span><span class="v num">${t.sessions ?? 0}</span><span class="s">active today</span></div>
-    </div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Session</th><th>Model</th><th class="r">Context</th><th class="r">Input</th><th class="r">Output</th><th class="r">Turns</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="note">No live sessions with usage data.</td></tr>'}</tbody></table></div></div>`);
+    </div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Session</th><th>Model</th><th class="r">Context</th><th class="r">Input</th><th class="r">Output</th><th class="r">Turns</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="note">No live sessions with usage data.</td></tr>'}</tbody></table><div class="note" style="padding:8px 12px 0">Measured from Claude Code transcripts. Cost is not shown: no reliable local source yet.</div></div></div>`);
 }
 
 export function renderSystem(zone, s) {
@@ -255,7 +261,7 @@ export function renderSystem(zone, s) {
     <div class="sys-grid">
       <div class="box"><div class="kv">CPU per core<b>${Math.round(sys.cpu?.value ?? 0)}%</b></div><div class="cores">${cores}</div><div class="note">${sys.cores ?? '?'} cores · 1 s sampling · temps need root</div></div>
       <div class="box"><div class="kv">Memory used<b>${bytes(m.used)}</b></div>
-        <div class="bar"><i style="width:${pct(m.wired)}%;background:#d9a441"></i><i style="width:${pct(m.compressed)}%;background:#c86bd6"></i><i style="width:${Math.max(0, pct(m.used) - pct(m.wired) - pct(m.compressed))}%;background:var(--mem)"></i></div>
+        <div class="bar"><i style="width:${pct(m.wired)}%;background:var(--faint)"></i><i style="width:${pct(m.compressed)}%;background:var(--line)"></i><i style="width:${Math.max(0, pct(m.used) - pct(m.wired) - pct(m.compressed))}%;background:var(--muted)"></i></div>
         <div class="kv">Wired<b>${bytes(m.wired)}</b></div><div class="kv">Compressed<b>${bytes(m.compressed)}</b></div><div class="kv">Swap<b>${bytes(m.swapBytes)}</b></div>
         <div class="kv">Network ↓ / ↑<b>${rate(sys.net?.rxBps)} / ${rate(sys.net?.txBps)}</b></div>
         <div class="kv">Disk free<b>${bytes(sys.disk?.freeBytes, 0)}</b></div>

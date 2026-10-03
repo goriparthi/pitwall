@@ -33,6 +33,10 @@ const usage = `usage: pitwall <command>
 
 func main() {
 	if len(os.Args) < 2 {
+		// launched from Finder as Pitwall.app: run instead of printing usage
+		if strings.Contains(exe(), ".app/Contents/MacOS/") {
+			os.Exit(runCmd(nil))
+		}
 		fmt.Fprintln(os.Stderr, usage)
 		os.Exit(2)
 	}

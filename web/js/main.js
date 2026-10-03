@@ -1,6 +1,6 @@
 // Client entry: SSE state stream, view selection (panel | full), keyboard shortcuts, command palette.
 import { esc } from './format.js';
-import { viewAgents, WIDGETS } from './render.js';
+import { viewAgents, WIDGETS, renderHeader, renderFooter } from './render.js';
 
 const params = new URLSearchParams(location.search);
 const view = params.get('view') === 'panel' ? 'panel' : 'full';
@@ -49,22 +49,22 @@ function activeLayout(s) {
 
 // Pixel width of each column for widgets that size themselves (e.g. agent card count).
 function columnWidths(cols) {
-  const inner = 1920 - 32 - 14 * (cols.length - 1);
+  const inner = 1920 - 48 - 16 * (cols.length - 1); // matches .panel padding and .grid gap
   const fixed = cols.reduce((sum, c) => sum + (c.endsWith('px') ? parseFloat(c) : 0), 0);
   const fr = cols.reduce((sum, c) => sum + (c.endsWith('fr') ? parseFloat(c) : 0), 0);
   return cols.map((c) => (c.endsWith('px') ? parseFloat(c) : ((inner - fixed) * parseFloat(c)) / (fr || 1)));
 }
 
 function buildSlots(layout) {
-  panel.querySelectorAll('.zone').forEach((z) => z.remove());
-  const off = $('offline');
+  const grid = $('grid');
+  grid.replaceChildren();
   slots = layout.slots.map((w) => {
     const el = document.createElement('section');
     el.className = `zone zone-${w}`;
-    panel.insertBefore(el, off);
+    grid.appendChild(el);
     return { widget: w, el };
   });
-  panel.style.gridTemplateColumns = layout.columns.join(' ');
+  grid.style.gridTemplateColumns = layout.columns.join(' ');
   builtLayout = `${layout.id}|${layout.columns.join(',')}|${layout.slots.join(',')}`;
 }
 
@@ -103,6 +103,8 @@ function render() {
       el.textContent = `Widget "${widget}" failed: ${err.message}`;
     }
   });
+  renderHeader($('hdr'), s, now, agents, layout);
+  renderFooter($('ftr'), s, agents);
   if (view === 'full') renderControls(s);
 }
 
@@ -126,7 +128,7 @@ setInterval(() => {
   const off = $('offline');
   const gap = Date.now() - lastMsgAt;
   if (gap > 5000) {
-    off.innerHTML = `<span>● Collector unreachable</span><small>${lastMsgAt ? `last update ${Math.round(gap / 1000)}s ago` : 'waiting for first update'} · retrying</small>`;
+    off.innerHTML = `<span>● Connection unavailable</span><small>${lastMsgAt ? `last update ${Math.round(gap / 1000)}s ago` : 'waiting for first update'} · retrying</small>`;
     off.hidden = false;
   } else off.hidden = true;
 }, 1000);
@@ -260,7 +262,7 @@ function renderControls(s) {
     <span class="grow"></span>
     <label>Panel brightness <input name="brightness" type="range" min="5" max="100" step="5" value="${s.ui.brightness}" data-brightness></label>
     <button data-palette><span class="kb">⌘K</span>Command palette</button>
-    ${att ? `<div class="att"><span>Attention queue (click to dismiss):</span>${att}</div>` : ''}`;
+    ${att ? `<div class="att"><span>Attention, select to acknowledge:</span>${att}</div>` : ''}`;
   if (c.__html !== html && !c.contains(document.activeElement)) {
     c.innerHTML = html;
     c.__html = html;

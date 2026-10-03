@@ -1,11 +1,13 @@
-# Pitwall
+<img src="assets/brand/lockup-light.svg" alt="pitwall" height="48">
 
-A glanceable cockpit for the Lian Li 8.8" Universal Screen (US88, SM088X, 1920 x 480). It shows Claude Code agents with an attention queue, live machine health, and a launcher for configured actions. One Go binary for macOS and Windows. Everything stays on your machine.
+**Your setup. In view.** A personal command center, built from templates.
+
+Pitwall turns a dedicated display, starting with the Lian Li 8.8" Universal Screen (US88, SM088X, 1920 x 480), into a glanceable view of your Claude Code agents, your machine and your shortcuts. One Go binary for macOS and Windows. Everything stays on your machine.
 
 ## Quick start
 
 ```sh
-scripts/build.sh                      # bin/pitwall for this Mac, dist/ for macOS arm64 + Windows amd64/arm64
+scripts/build.sh                      # bin/pitwall, plus dist/: Pitwall.app, macOS arm64, Windows amd64/arm64
 bin/pitwall start             # background: server, panel, LED ring, menu bar item, hotkeys
 bin/pitwall hooks install     # Claude Code hooks (backs up ~/.claude/settings.json)
 bin/pitwall open              # full dashboard on the main monitor
@@ -23,6 +25,10 @@ Requirements: Go 1.26+. On macOS, Homebrew `libusb` at build time (it is linked 
 - **Global hotkeys** (⌃⌥ on macOS, Ctrl+Alt on Windows): `F` focus, `H` privacy, `R` rotate layouts, `1`-`9` layouts, `D` dashboard, `K` command palette.
 - **Full dashboard** (`open`, or `D`): the same view on your main monitor with controls, the attention queue, a brightness slider and ⌘K palette. Its keys work without the modifier.
 - **Attention:** a waiting agent turns the panel banner and edge amber, makes the LED ring breathe amber, and shows `▲ n` in the menu bar. Failures are red; a working agent is a faint blue on the ring.
+
+## Brand
+
+Brand assets and tokens live in `assets/` (from the Pitwall brand kit v1.0): wordmarks and lockups, macOS/Windows/web icons, `design/tokens.json`, the component spec and the implementation guide. The UI reads its colors from those tokens. Status colors are semantic and never the lime accent. The panel shows no tappable-looking controls, and motion is limited to states backed by telemetry. The Windows `.exe` icon comes from `cmd/pitwall/rsrc_windows_*.syso` (regenerate with `go run github.com/tc-hib/go-winres@latest simply --icon assets/icons/windows/icon-256.png` in that folder).
 
 ## Templates and customization
 

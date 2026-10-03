@@ -2,58 +2,61 @@ package tray
 
 import (
 	"bytes"
+	_ "embed"
 	"encoding/binary"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"math"
-	"runtime"
 )
 
-// icon draws an anti-aliased ring with a filled center in c; PNG on macOS, PNG-in-ICO on Windows.
-func icon(c color.NRGBA) []byte {
-	const n = 32
-	img := image.NewNRGBA(image.Rect(0, 0, n, n))
-	for y := 0; y < n; y++ {
-		for x := 0; x < n; x++ {
-			d := math.Hypot(float64(x)-15.5, float64(y)-15.5)
-			a := 0.0
-			switch {
-			case d <= 6.5:
-				a = 1
-			case d <= 7.5:
-				a = 7.5 - d
-			case d >= 11 && d <= 13:
-				a = 1
-			case d > 10 && d < 11:
-				a = d - 10
-			case d > 13 && d < 14:
-				a = 14 - d
-			}
-			if a > 0 {
-				img.SetNRGBA(x, y, color.NRGBA{c.R, c.G, c.B, uint8(float64(c.A) * a)})
+// Brand assets (assets/icons): the macOS template glyph is black on transparent so the OS tints it;
+// Windows uses the full-color icon with a status dot, since its tray shows no title text.
+var (
+	//go:embed assets/menu-template-32.png
+	menuTemplate []byte
+	//go:embed assets/icon-32.png
+	brandIcon32 []byte
+)
+
+// withDot overlays a status dot (bottom right) on the brand icon and wraps it as a PNG-in-ICO.
+func withDot(c *color.NRGBA) []byte {
+	src, err := png.Decode(bytes.NewReader(brandIcon32))
+	if err != nil {
+		return nil
+	}
+	img := image.NewNRGBA(src.Bounds())
+	draw.Draw(img, img.Bounds(), src, image.Point{}, draw.Src)
+	if c != nil {
+		cx, cy, r := 24.5, 24.5, 6.5
+		for y := 16; y < 32; y++ {
+			for x := 16; x < 32; x++ {
+				d := math.Hypot(float64(x)-cx, float64(y)-cy)
+				switch {
+				case d <= r:
+					img.SetNRGBA(x, y, *c)
+				case d <= r+1.5: // dark ring so the dot reads on any taskbar
+					img.SetNRGBA(x, y, color.NRGBA{11, 16, 20, 255})
+				}
 			}
 		}
 	}
 	var buf bytes.Buffer
 	_ = png.Encode(&buf, img)
-	if runtime.GOOS != "windows" {
-		return buf.Bytes()
-	}
-	// ICONDIR + one ICONDIRENTRY pointing at the PNG (supported since Windows Vista)
 	var ico bytes.Buffer
 	_ = binary.Write(&ico, binary.LittleEndian, []uint16{0, 1, 1})
-	ico.Write([]byte{n, n, 0, 0})
+	ico.Write([]byte{32, 32, 0, 0})
 	_ = binary.Write(&ico, binary.LittleEndian, []uint16{1, 32})
 	_ = binary.Write(&ico, binary.LittleEndian, []uint32{uint32(buf.Len()), 22})
 	ico.Write(buf.Bytes())
 	return ico.Bytes()
 }
 
+// Status colors are the semantic tokens, never the brand accent.
 var (
-	iconCalm    = icon(color.NRGBA{150, 160, 176, 255})
-	iconWorking = icon(color.NRGBA{76, 184, 255, 255})
-	iconWaiting = icon(color.NRGBA{255, 178, 36, 255})
-	iconFailed  = icon(color.NRGBA{255, 93, 98, 255})
-	iconOff     = icon(color.NRGBA{110, 116, 128, 160})
+	icoCalm    = withDot(nil)
+	icoWorking = withDot(&color.NRGBA{0x75, 0xC7, 0xFF, 255})
+	icoWaiting = withDot(&color.NRGBA{0xFF, 0xD0, 0x76, 255})
+	icoFailed  = withDot(&color.NRGBA{0xFF, 0x8E, 0x87, 255})
 )

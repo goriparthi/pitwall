@@ -3,9 +3,11 @@
 package tray
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"fyne.io/systray"
@@ -35,8 +37,24 @@ func Run(o Options) {
 
 func Stop() { systray.Quit() }
 
+// setIcon: on macOS the template glyph always (the title carries status); on Windows the dotted brand icon.
+var (
+	iconMu   sync.Mutex
+	lastIcon []byte
+)
+
+func setIcon(windowsIco []byte) {
+	iconMu.Lock()
+	defer iconMu.Unlock()
+	if bytes.Equal(lastIcon, windowsIco) {
+		return
+	}
+	lastIcon = windowsIco
+	systray.SetTemplateIcon(menuTemplate, windowsIco)
+}
+
 func onReady(o Options) {
-	systray.SetIcon(iconCalm)
+	setIcon(icoCalm)
 	systray.SetTooltip("Pitwall")
 	bind := map[Key]func(){
 		'F': func() { o.Srv.PatchUI(map[string]any{"focus": !o.Srv.UI().Focus}) },
@@ -181,16 +199,16 @@ func buildMenu(ctx context.Context, o Options) {
 		header.SetTitle(fmt.Sprintf("Pitwall · %s · %d session(s)", mode, len(list)))
 		switch {
 		case count["waiting"] > 0:
-			systray.SetIcon(iconWaiting)
+			setIcon(icoWaiting)
 			systray.SetTitle(fmt.Sprintf("▲ %d", count["waiting"]))
 		case count["failed"] > 0:
-			systray.SetIcon(iconFailed)
+			setIcon(icoFailed)
 			systray.SetTitle(fmt.Sprintf("✕ %d", count["failed"]))
 		case count["working"] > 0:
-			systray.SetIcon(iconWorking)
+			setIcon(icoWorking)
 			systray.SetTitle(fmt.Sprintf("%d", count["working"]))
 		default:
-			systray.SetIcon(iconCalm)
+			setIcon(icoCalm)
 			systray.SetTitle("")
 		}
 		systray.SetTooltip(fmt.Sprintf("Pitwall: %d working, %d waiting", count["working"], count["waiting"]))
