@@ -2,7 +2,9 @@
 package demo
 
 import (
+	"fmt"
 	"math"
+	"sort"
 	"math/rand/v2"
 	"sync"
 	"time"
@@ -51,12 +53,83 @@ func (s *Source) tick() {
 	push("gpu", wave(t, 31000, 4, 48, 0))
 }
 
+const storyMs = 36000
+
+// story plays a 36 s loop: three agents work, api-gateway-3 asks to approve Bash at 8 s (until 20 s),
+// and infra-7 finishes at 14 s. Elapsed times and token counts keep moving so the panel looks alive.
+func (s *Source) story(n int64) M {
+	elapsed := n - s.t0.UnixMilli()
+	cycle := n - elapsed%storyMs // start of the current loop
+	t := elapsed % storyMs
+	u := func(model string, ctx, in, out float64, turns int) M {
+		return M{"model": model, "contextTokens": ctx, "inputTokens": in, "outputTokens": out, "turns": turns}
+	}
+	grow := float64(t) / 1000
+	agent := func(id, name, project, status string, since int64, task, ev string, extra M) M {
+		a := M{"id": id, "tool": "claude-code", "label": "Claude Code", "name": name, "project": project, "status": status,
+			"statusSource": "hooks", "since": since, "task": task, "lastEvent": ev, "hooks": true, "subagents": 0}
+		for k, v := range extra {
+			a[k] = v
+		}
+		return a
+	}
+
+	api := agent("d1", "api-gateway-3", "api-gateway", "working", cycle-290000, "Migrate rate limiter to sliding window", "Bash · go test ./...",
+		M{"usage": u("claude-opus-5-5", 84000+grow*120, 2.1e6+grow*9000, 39800+grow*40, 6)})
+	if t >= 8000 && t < 20000 {
+		api["status"], api["since"] = "waiting", cycle+8000
+		api["wait"] = M{"kind": "approval", "tool": "Bash", "since": cycle + 8000}
+	} else if t >= 20000 {
+		api["lastEvent"] = "Edit limiter.go"
+	}
+	webEvent := "Edit theme.css"
+	if t >= 12000 {
+		webEvent = "Bash · npm run build"
+	}
+	web := agent("d2", "web-dashboard-1", "web-dashboard", "working", cycle-312000, "Add dark mode tokens to settings page", webEvent,
+		M{"subagents": 2, "usage": u("claude-sonnet-5-5", 58000+grow*150, 1.3e6+grow*12000, 27100+grow*55, 4)})
+	infra := agent("d3", "infra-7", "infra", "working", cycle-520000, "Tighten S3 bucket policies", "Read main.tf",
+		M{"usage": u("claude-opus-5-5", 118000+grow*60, 3.4e6, 64900+grow*30, 10)})
+	if t >= 14000 {
+		infra["status"], infra["since"], infra["lastTurnMs"] = "completed", cycle+14000, int64(534000)
+		infra["usage"] = u("claude-opus-5-5", 120300, 3.4e6, 66100, 11)
+	}
+	notes := agent("d4", "notes-2", "notes", "idle", cycle-3600000, "Weekly summary draft", "", M{"usage": nil, "hooks": false, "statusSource": "registry"})
+
+	// same ordering as the live collector: waiting, failed, working, completed, idle
+	rank := map[string]int{"waiting": 0, "failed": 1, "working": 2, "completed": 3, "idle": 4}
+	agents := []M{api, web, infra, notes}
+	sort.SliceStable(agents, func(i, j int) bool { return rank[agents[i]["status"].(string)] < rank[agents[j]["status"].(string)] })
+
+	attention := []M{}
+	feed := []M{{"id": "f0", "sessionId": "d2", "at": cycle - 312000, "kind": "start", "text": "New task started"}}
+	if api["status"] == "waiting" {
+		attention = append(attention, M{"id": fmt.Sprintf("a1-%d", cycle), "agentId": "d1", "kind": "waiting", "since": cycle + 8000, "name": "api-gateway-3", "project": "api-gateway", "detail": "approval"})
+	}
+	if t >= 8000 {
+		feed = append([]M{{"id": fmt.Sprintf("f1-%d", cycle), "sessionId": "d1", "at": cycle + 8000, "kind": "wait", "text": "Needs approval: Bash"}}, feed...)
+	}
+	if t >= 14000 {
+		attention = append(attention, M{"id": fmt.Sprintf("a3-%d", cycle), "agentId": "d3", "kind": "completed", "since": cycle + 14000, "name": "infra-7", "project": "infra", "detail": 534000})
+		feed = append([]M{{"id": fmt.Sprintf("f2-%d", cycle), "sessionId": "d3", "at": cycle + 14000, "kind": "done", "text": "Task completed", "durationMs": 534000}}, feed...)
+	}
+	if t >= 20000 {
+		feed = append([]M{{"id": fmt.Sprintf("f3-%d", cycle), "sessionId": "d1", "at": cycle + 20000, "kind": "info", "text": "Approved: Bash"}}, feed...)
+	}
+	return M{
+		"agents":      agents,
+		"attention":   attention,
+		"feed":        feed,
+		"today":       M{"input": 18.2e6 + grow*21000, "output": 402000 + grow*125, "turns": 37, "sessions": 6, "hookCompletions": 29},
+		"integration": M{"registry": true, "hooksSeen": true, "lastHookEventAt": n},
+	}
+}
+
 // Snapshot returns system, claude and tools sections in the live shapes.
 func (s *Source) Snapshot() (system, claude, tools M) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	n := time.Now().UnixMilli()
-	b := s.t0.UnixMilli() // anchored so attention items keep a stable identity
 	last := func(k string) float64 { h := s.history[k]; return h[len(h)-1] }
 	m := func(v any, iv int64, extra M) M {
 		out := M{"value": v, "updatedAt": n, "intervalMs": iv}
@@ -92,35 +165,7 @@ func (s *Source) Snapshot() (system, claude, tools M) {
 		"self":    m(0.8, 5000, M{"rssBytes": 61e6}),
 		"history": hist,
 	}
-	agent := func(id, name, project, status, src string, since int64, task, ev string, extra M) M {
-		a := M{"id": id, "tool": "claude-code", "label": "Claude Code", "name": name, "project": project, "status": status, "statusSource": src, "since": since, "task": task, "lastEvent": ev, "hooks": src == "hooks", "subagents": 0}
-		for k, v := range extra {
-			a[k] = v
-		}
-		return a
-	}
-	u := func(model string, ctx, in, out float64, turns int) M {
-		return M{"model": model, "contextTokens": ctx, "inputTokens": in, "outputTokens": out, "turns": turns}
-	}
-	claude = M{
-		"agents": []M{
-			agent("d1", "api-gateway-3", "api-gateway", "waiting", "hooks", b-47000, "Migrate rate limiter to sliding window", "Bash", M{"wait": M{"kind": "approval", "tool": "Bash"}, "usage": u("claude-opus-5-5", 88400, 2.1e6, 41200, 6)}),
-			agent("d2", "web-dashboard-1", "web-dashboard", "working", "hooks", b-312000, "Add dark mode tokens to settings page", "Edit theme.css", M{"subagents": 2, "usage": u("claude-sonnet-5-5", 61200, 1.3e6, 28800, 4)}),
-			agent("d3", "infra-7", "infra", "completed", "hooks", b-140000, "Tighten S3 bucket policies", "Read main.tf", M{"lastTurnMs": 534000, "usage": u("claude-opus-5-5", 120300, 3.4e6, 66100, 11)}),
-			agent("d4", "notes-2", "notes", "idle", "registry", b-3600000, "Weekly summary draft", "", M{"usage": nil}),
-		},
-		"attention": []M{
-			{"id": "a1", "agentId": "d1", "kind": "waiting", "since": b - 47000, "name": "api-gateway-3", "project": "api-gateway", "detail": "approval"},
-			{"id": "a3", "agentId": "d3", "kind": "completed", "since": b - 140000, "name": "infra-7", "project": "infra", "detail": 534000},
-		},
-		"feed": []M{
-			{"id": "f1", "sessionId": "d1", "at": b - 47000, "kind": "wait", "text": "Needs approval: Bash"},
-			{"id": "f2", "sessionId": "d3", "at": b - 140000, "kind": "done", "text": "Task completed", "durationMs": 534000},
-			{"id": "f3", "sessionId": "d2", "at": b - 312000, "kind": "start", "text": "New task started"},
-		},
-		"today":       M{"input": 18.2e6, "output": 402000, "turns": 37, "sessions": 6, "hookCompletions": 29},
-		"integration": M{"registry": true, "hooksSeen": true, "lastHookEventAt": b - 47000},
-	}
+	claude = s.story(n)
 	tools = M{"tools": []M{
 		{"id": "ollama", "label": "Ollama", "status": "loaded", "detail": "1 model loaded", "processes": 2},
 		{"id": "codex", "label": "Codex CLI", "status": "running", "detail": "running; task status unavailable", "processes": 1},

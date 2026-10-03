@@ -22,9 +22,9 @@
   <img alt="License" src="https://img.shields.io/badge/license-MIT-D5FF45?style=flat-square&labelColor=141C22">
 </p>
 
-![Pitwall on a 1920 x 480 panel: an agent waiting for approval in amber, a working agent, machine health and a launcher](site/img/panel-balanced.jpg)
+![Pitwall in motion: agents working, an approval request turning the panel amber, a task finishing, and a tour of layouts](site/img/pitwall-demo.gif)
 
-<sub>A real build at the Lian Li 8.8" Universal Screen's native 1920 x 480, running Pitwall's labelled demo data.</sub>
+<sub>Recorded from a real build at the Lian Li 8.8" Universal Screen's native 1920 x 480, running Pitwall's labelled demo story.</sub>
 
 Pitwall turns a dedicated display, starting with the **Lian Li 8.8" Universal Screen** (US88, SM088X), into a glanceable view of your **Claude Code agents**, your **machine** and your **shortcuts**. When an agent needs you, you see it before you go looking. One Go binary for macOS and Windows; everything stays on your machine.
 

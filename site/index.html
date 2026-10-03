@@ -68,7 +68,7 @@ nav .links a:hover { color: var(--text); }
 /* device showcase */
 .device { margin: 56px auto 0; max-width: 1248px; padding: 0 24px; position: relative; }
 .device .bezel { background: linear-gradient(180deg, #1a2026, #0d1114); border-radius: 18px; padding: 14px; box-shadow: 0 0 0 1px #2a333b, 0 40px 120px -30px rgba(0, 0, 0, .9), 0 0 0 7px #0a0d10, 0 0 0 8px #262e35; }
-.device .bezel img { border-radius: 6px; width: 100%; aspect-ratio: 4 / 1; object-fit: cover; }
+.device .bezel img, .device .bezel video { border-radius: 6px; width: 100%; height: auto; aspect-ratio: 4 / 1; object-fit: cover; display: block; background: #0B1014; }
 .device::after { content: ""; position: absolute; left: 10%; right: 10%; bottom: -60px; height: 80px; background: radial-gradient(closest-side, rgba(213, 255, 69, .10), transparent); pointer-events: none; }
 .caption { text-align: center; color: var(--text-3); font-size: 14px; margin-top: 26px; }
 
@@ -186,8 +186,8 @@ footer a { color: var(--text-2); text-decoration: none; }
       </svg>
     </div>
     <figure class="device">
-      <div class="bezel"><img src="img/panel-balanced.jpg" width="3840" height="960" alt="Pitwall on a 1920 by 480 display: an agent waiting for approval highlighted in amber, a working agent, computer health tiles and a launcher"></div>
-      <figcaption class="caption">A real build at the Lian Li 8.8″ Universal Screen's native 1920 × 480, running Pitwall's labelled demo data.</figcaption>
+      <div class="bezel"><video id="demo" autoplay muted loop playsinline preload="auto" poster="img/pitwall-demo-poster.jpg" width="1920" height="480" aria-label="Pitwall in motion: agents working, an approval request turning the panel amber, a task finishing, and a tour of layouts"><source src="img/pitwall-demo.mp4" type="video/mp4"><img src="img/pitwall-demo.gif" alt="Pitwall in motion"></video></div>
+      <figcaption class="caption">Recorded from a real build at the Lian Li 8.8″ Universal Screen's native 1920 × 480, running Pitwall's labelled demo story.</figcaption>
     </figure>
   </header>
 
@@ -326,6 +326,11 @@ bin/pitwall run --demo --no-display</pre></div>
 </footer>
 
 <script>
+  // respect reduced motion: show the poster frame instead of playing the demo
+  (function () {
+    const v = document.getElementById('demo');
+    if (v && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { v.removeAttribute('autoplay'); v.pause(); }
+  })();
   // gauge ticks around the hero dial
   (function () {
     const g = document.getElementById('ticks');
