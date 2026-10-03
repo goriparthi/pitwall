@@ -296,27 +296,133 @@ function opsState(src) {
   return src.stale ? 'unknown' : src.status;
 }
 
-export function renderOps(zone, s, now) {
-  const O = s.ops;
-  if (!O?.present || !O.sources?.length) return setHTML(zone, '');
-  const priv = s.ui.privacy;
-  const [src, ...others] = O.sources;
+const compact = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}k` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : `${Math.round(n)}`);
+const hhmm = (ms) => new Date(ms).toTimeString().slice(0, 5);
+// neutrals for series the source leaves uncolored: bars recede, lines read as primary ink
+const NEUTRAL = { bar: '#5B6A75', line: '#F3F5EF', area: '#83959F' };
+
+function niceMax(v) {
+  if (!(v > 0)) return 1;
+  const p = 10 ** Math.floor(Math.log10(v));
+  return [1, 2, 2.5, 5, 10].map((m) => m * p).find((m) => m >= v);
+}
+
+// x ticks on whole hours, about four across the range
+function hourTicks(t0, t1) {
+  const span = (t1 - t0) / 3600000;
+  const step = [1, 2, 3, 4, 6, 12].find((h) => span / h <= 4) ?? 24;
+  const out = [];
+  const d = new Date(t0);
+  d.setMinutes(0, 0, 0);
+  for (let t = d.getTime(); t <= t1; t += 3600000) if (t >= t0 && new Date(t).getHours() % step === 0) out.push(t);
+  return out;
+}
+
+// One chart as inline SVG. The panel has no input, so values are labelled in the legend instead of tooltips.
+function chartSVG(c, w, h) {
+  const pad = { l: 56, r: 8, t: 8, b: 32 }; // b leaves room under the 0 label for the time labels
+  const pw = w - pad.l - pad.r;
+  const ph = h - pad.t - pad.b;
+  const series = c.series.filter((s) => s.points.length);
+  if (!series.length) return `<div class="op-nochart">No data in range</div>`;
+  const ts = series.flatMap((s) => s.points.map((p) => p[0]));
+  const t0 = Math.min(...ts);
+  const t1 = Math.max(...ts);
+  const stacked = c.kind === 'stacked-area';
+  let top = 0;
+  const stack = new Map();
+  if (stacked) {
+    for (const t of new Set(ts)) {
+      let sum = 0;
+      for (const s of series) sum += s.points.find((p) => p[0] === t)?.[1] ?? 0;
+      top = Math.max(top, sum);
+    }
+  } else top = Math.max(...series.flatMap((s) => s.points.map((p) => p[1])));
+  const ymax = niceMax(top);
+  const bucket = !stacked && series.some((s) => s.kind === 'bar') ? (t1 - t0) / Math.max(1, series.find((s) => s.kind === 'bar').points.length - 1) : 0;
+  const span = t1 - t0 + bucket || 1;
+  const x = (t) => pad.l + ((t - t0 + bucket / 2) / span) * pw;
+  const y = (v) => pad.t + ph - (v / ymax) * ph;
+  const grid = [0, 0.5, 1].map((f) => `<line class="cg" x1="${pad.l}" x2="${pad.l + pw}" y1="${y(ymax * f)}" y2="${y(ymax * f)}"/><text class="ct" x="${pad.l - 8}" y="${y(ymax * f) + 6}" text-anchor="end">${compact(ymax * f)}</text>`).join('');
+  const ticks = hourTicks(t0, t1).map((t) => `<text class="ct" x="${x(t)}" y="${h - 4}" text-anchor="middle">${hhmm(t)}</text>`).join('');
+  let marks = '';
+  if (stacked) {
+    const times = [...new Set(ts)].sort((a, b) => a - b);
+    const base = new Map(times.map((t) => [t, 0]));
+    for (const s of series) {
+      const at = new Map(s.points);
+      const lo = times.map((t) => base.get(t));
+      const hi = times.map((t, i) => lo[i] + (at.get(t) ?? 0));
+      if (hi.every((v, i) => v === lo[i])) continue;
+      const upper = times.map((t, i) => `${x(t).toFixed(1)},${y(hi[i]).toFixed(1)}`);
+      const lower = times.map((t, i) => `${x(t).toFixed(1)},${y(lo[i]).toFixed(1)}`).reverse();
+      // a 2px surface stroke on each top edge keeps stacked fills apart
+      marks += `<path d="M${upper.join('L')}L${lower.join('L')}Z" fill="${s.color || NEUTRAL.area}" fill-opacity=".85"/><path d="M${upper.join('L')}" fill="none" stroke="var(--card)" stroke-width="2"/>`;
+      times.forEach((t, i) => base.set(t, hi[i]));
+    }
+  } else {
+    const bars = series.filter((s) => s.kind === 'bar');
+    const bw = Math.max(3, (pw / Math.max(1, bars[0]?.points.length ?? 1)) * 0.72 / Math.max(1, bars.length));
+    bars.forEach((s, k) => {
+      for (const [t, v] of s.points) {
+        const bx = x(t) - (bw * bars.length) / 2 + k * bw + 1;
+        const by = y(v);
+        const bh = pad.t + ph - by;
+        if (bh <= 0) continue;
+        const r = Math.min(4, bh, (bw - 2) / 2);
+        // rounded data end, square on the baseline
+        marks += `<path d="M${bx},${by + bh}V${by + r}Q${bx},${by} ${bx + r},${by}H${bx + bw - 2 - r}Q${bx + bw - 2},${by} ${bx + bw - 2},${by + r}V${by + bh}Z" fill="${s.color || NEUTRAL.bar}"/>`;
+      }
+    });
+    for (const s of series.filter((s) => s.kind === 'line')) {
+      const pts = s.points.map(([t, v]) => `${x(t).toFixed(1)},${y(v).toFixed(1)}`);
+      const col = s.color || NEUTRAL.line;
+      marks += `<path d="M${pts.join('L')}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
+      marks += s.points.map(([t, v]) => `<circle cx="${x(t).toFixed(1)}" cy="${y(v).toFixed(1)}" r="4" fill="${col}" stroke="var(--card)" stroke-width="2"/>`).join('');
+    }
+  }
+  return `<svg class="op-svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(c.label)}">${grid}${marks}${ticks}</svg>`;
+}
+
+function chartLegend(c) {
+  return c.series.map((s) => {
+    const last = s.points.length ? s.points[s.points.length - 1][1] : null;
+    const col = s.color || NEUTRAL[s.kind] || NEUTRAL.area;
+    const sw = s.kind === 'line' ? `<svg width="18" height="10" aria-hidden="true"><line x1="1" y1="5" x2="17" y2="5" stroke="${col}" stroke-width="2"/><circle cx="9" cy="5" r="3" fill="${col}"/></svg>` : `<span class="op-sw" style="background:${col}"></span>`;
+    return `<span class="op-li">${sw}${esc(s.name)}${last != null ? ` <b class="num">${compact(last)}</b>` : ''}</span>`;
+  }).join('');
+}
+
+function opsHead(src, now, label) {
   const st = opsState(src);
-  const old = src.stale || src.failing;
   const tag = src.failing
     ? '<span class="tag">No reading</span>'
     : `<span class="tag op-${st}">${esc(OPS_WORD[st])}</span>${src.stale ? ' <span class="tag warn">stale</span>' : ''}`;
   const read = !src.hasReading
     ? src.error ? `no reading · ${esc(src.error)}` : 'waiting for the first reading'
     : src.failing ? `${esc(src.error)} · last read ${agoText(now - src.asOf)}` : `read ${agoText(now - src.asOf)}`;
-  const head = `<div class="zone-head"><span class="eyebrow">${icon('activity', 18)}Ops</span>${tag}<span class="right"><b>${esc(src.label)}</b> · ${read}</span></div>`;
+  return `<div class="zone-head"><span class="eyebrow">${icon('activity', 18)}${esc(label)}</span>${tag}<span class="right"><b>${esc(src.label)}</b> · ${read}</span></div>`;
+}
+
+function opsCard(it, old, priv, swatches) {
+  const st = old ? 'unknown' : it.status;
+  const sw = it.series && swatches[it.series] ? `<span class="op-sw" style="background:${swatches[it.series]}"></span>` : '<span class="op-dot"></span>';
+  const flag = !old && (st === 'warn' || st === 'crit') ? `<span class="tag op-${st}">${OPS_WORD[st]}</span>` : '';
+  return `<div class="op op-${st}"><span class="op-k">${sw}<span class="op-kl">${esc(it.label)}</span>${flag}</span>
+      <span class="op-v num">${esc(it.value)}</span><span class="op-d">${priv ? '' : esc(it.detail ?? '')}</span></div>`;
+}
+
+export function renderOps(zone, s, now, width = 600) {
+  const O = s.ops;
+  if (!O?.present || !O.sources?.length) return setHTML(zone, '');
+  const priv = s.ui.privacy;
+  const [src, ...others] = O.sources;
+  const old = src.stale || src.failing;
+  const head = opsHead(src, now, 'Ops');
   if (!src.hasReading) {
     return setHTML(zone, `${head}<div class="lim-empty">${icon('activity', 28)}<div><b>No reading yet</b><br>${src.error ? `The status command failed: ${esc(src.error)}.` : 'The status command runs on its interval.'}</div></div>`);
   }
-  const tiles = src.items.slice(0, 4).map((it) => `<div class="op op-${old ? 'unknown' : it.status}">
-      <span class="op-k"><span class="op-dot"></span>${esc(it.label)}</span>
-      <span class="op-v num">${esc(it.value)}</span>
-      <span class="op-d">${priv ? '' : esc(it.detail ?? '')}</span></div>`).join('');
+  const swatches = Object.fromEntries((src.charts ?? []).flatMap((c) => c.series.filter((x) => x.color).map((x) => [x.name, x.color])));
   const notes = src.findings.filter((f) => f.status !== 'ok').slice(0, 2);
   const line = priv
     ? ''
@@ -324,6 +430,21 @@ export function renderOps(zone, s, now) {
       ? notes.map((f) => `<div class="op-f op-${old ? 'unknown' : f.status}">${icon('attention', 18)}<span>${esc(f.text)}</span></div>`).join('')
       : src.summary ? `<div class="op-f">${icon('check', 18)}<span>${esc(src.summary)}</span></div>` : '';
   const more = others.map((o) => `<div class="op-f op-${opsState(o)}"><span class="op-dot"></span><span>${esc(o.label)} · ${esc(OPS_WORD[opsState(o)])}</span></div>`).join('');
+
+  // Wide slot: the full desk, cards on the left and charts on the right, like the Grafana dashboard.
+  const charts = src.charts ?? [];
+  if (width >= 1400) {
+    const cardsW = charts.length ? 880 : width;
+    const chartW = charts.length ? Math.floor((width - cardsW - 16 * charts.length) / charts.length) : 0;
+    const cards = src.items.slice(0, 8).map((it) => opsCard(it, old, priv, swatches)).join('');
+    const panes = charts.map((c) => `<div class="op-chart"><div class="op-ch"><span class="op-cl">${esc(c.label)}</span>${c.unit ? `<span class="op-cu">${esc(c.unit)}</span>` : ''}</div>
+        ${chartSVG(c, chartW - 24, 190)}<div class="op-lg">${chartLegend(c)}</div></div>`).join('');
+    return setHTML(zone, `${head}<div class="ops ops-wide${old ? ' is-stale' : ''}" style="grid-template-columns:${cardsW}px${charts.map(() => ' minmax(0,1fr)').join('')}">
+      <div class="op-tiles op-tiles-8">${cards}</div>${panes}</div><div class="op-foot${old ? ' is-stale' : ''}">${line}${more}</div>`);
+  }
+  // Narrow slot: the summary items, falling back to the first four.
+  const pick = [...src.items.filter((i) => !i.series), ...src.items.filter((i) => i.series)].slice(0, 4);
+  const tiles = pick.map((it) => opsCard(it, old, priv, swatches)).join('');
   setHTML(zone, `${head}<div class="ops${old ? ' is-stale' : ''}"><div class="op-tiles">${tiles}</div>${line}${more}</div>`);
 }
 
@@ -341,7 +462,8 @@ function opsChip(s) {
 export function renderHeader(el, s, now, agents, layout) {
   const proj = s.projects.find((p) => p.id === s.ui.project);
   const scope = proj ? (s.ui.privacy ? 'Project hidden' : proj.name) : 'All projects';
-  const urgent = agents.filter((a) => a.status === 'waiting' || a.status === 'failed');
+  const solo = !!layout?.standalone;
+  const urgent = solo ? [] : agents.filter((a) => a.status === 'waiting' || a.status === 'failed');
   let center;
   if (urgent.length) {
     // the attention pill replaces the workspace title; approvals and failures only, completions are counted, not shouted
@@ -350,12 +472,12 @@ export function renderHeader(el, s, now, agents, layout) {
     const what = failed ? `failed · ${String(a.error ?? 'error').replaceAll('_', ' ')}` : `${WAIT_TEXT[a.wait?.kind] ?? 'is waiting for you'}${a.wait?.tool ? ` · ${a.wait.tool}` : ''}`;
     center = `<div class="pill${failed ? ' failed' : ''}"><span>${failed ? '✕' : '▲'}</span><b>${esc(a.name ?? a.project ?? 'Claude Code')}</b><span>${esc(what)}</span>${urgent.length > 1 ? `<span class="more">+${urgent.length - 1} more</span>` : ''}<span class="num">${duration(now - (a.since ?? now))}</span></div>`;
   } else {
-    center = `<div class="title">${esc(layout?.name ?? 'Overview')} <span class="scope">/ ${esc(scope)}</span></div>`;
+    center = `<div class="title">${esc(layout?.name ?? 'Overview')}${solo ? '' : ` <span class="scope">/ ${esc(scope)}</span>`}</div>`;
   }
   const ds = s.display?.state;
   const meta = [
-    opsChip(s),
-    limitChip(s, now),
+    solo ? '' : opsChip(s),
+    solo ? '' : limitChip(s, now),
     s.mode === 'demo' ? '<span class="demo">Demo data</span>' : '<span>Live</span>',
     ds && !['streaming', 'unknown', 'stopped'].includes(ds) ? `<span class="warn">Panel ${esc(ds)}</span>` : '',
     `<span class="clock">${clock(now)}</span>`,
@@ -363,14 +485,18 @@ export function renderHeader(el, s, now, agents, layout) {
   setHTML(el, `<img class="wordmark" src="/brand/lockup-light.svg" alt="pitwall">${center}<div class="meta">${meta}</div>`);
 }
 
-export function renderFooter(el, s, agents) {
+export function renderFooter(el, s, agents, layout) {
   const names = Object.fromEntries((s.layouts ?? []).map((l) => [l.id, l.name]));
   const tabs = (s.pageOrder ?? []).map((id, i) => `<span class="tab${s.ui.page === id && !s.ui.focus ? ' on' : ''}"><span class="n">${String(i + 1).padStart(2, '0')}</span>${esc(names[id] ?? id)}</span>`).join('');
   const flags = [s.ui.focus && 'Focus', s.ui.privacy && 'Private', s.ui.rotate && 'Rotating'].filter(Boolean).map((f) => `<span class="flag">${f}</span>`).join('');
   const waiting = agents.filter((a) => a.status === 'waiting').length;
   const failed = agents.filter((a) => a.status === 'failed').length;
   let right;
-  if (waiting || failed) {
+  if (layout?.standalone) {
+    // standalone pages report on their own source, never on agents
+    const src = s.ops?.sources?.[0];
+    right = src?.hasReading ? `<span class="right"><span class="t">${clock(src.checkedAt)}</span>${esc(src.label)} · ${s.ui.privacy ? '' : esc(src.summary)}</span>` : '<span class="right"></span>';
+  } else if (waiting || failed) {
     const parts = [waiting && `${waiting} agent${waiting > 1 ? 's' : ''} need${waiting > 1 ? '' : 's'} you`, failed && `${failed} failed`].filter(Boolean);
     right = `<span class="right ${waiting ? 'hot' : 'bad'}">${parts.join(' · ')}</span>`;
   } else {
@@ -424,7 +550,7 @@ export const WIDGETS = {
   health: (el, c) => renderHealth(el, c.state, c.now),
   'health-mini': (el, c) => renderHealthMini(el, c.state),
   limits: (el, c) => renderLimits(el, c.state, c.now),
-  ops: (el, c) => renderOps(el, c.state, c.now),
+  ops: (el, c) => renderOps(el, c.state, c.now, c.width),
   launcher: (el, c) => renderLaunch(el, c.state, c.now, c.flash),
   usage: (el, c) => renderUsage(el, c.state, c.agents),
   system: (el, c) => renderSystem(el, c.state),

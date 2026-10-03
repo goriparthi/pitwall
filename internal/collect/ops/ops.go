@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +24,9 @@ const (
 	maxStdout   = 64 << 10
 	maxItems    = 8
 	maxFindings = 6
+	maxCharts   = 3
+	maxSeries   = 6
+	maxPoints   = 400
 	failingRuns = 3 // consecutive read failures before the widget says there is no reading
 )
 
@@ -32,11 +36,29 @@ type Item struct {
 	Status string `json:"status"`
 	Value  string `json:"value"`
 	Detail string `json:"detail,omitempty"`
+	Series string `json:"series,omitempty"` // a chart series name; the panel shows that series' color as the item's swatch
 }
 
 type Finding struct {
 	Status string `json:"status"`
 	Text   string `json:"text"`
+}
+
+// Series is one line, bar set or area: [epoch ms, value] points, oldest first.
+type Series struct {
+	Name   string       `json:"name"`
+	Kind   string       `json:"kind,omitempty"`  // area | bar | line; set by the chart kind when empty
+	Color  string       `json:"color,omitempty"` // #RRGGBB; empty means the panel's neutral for that kind
+	Points [][2]float64 `json:"points"`
+}
+
+// Chart kinds: stacked-area (every series an area, stacked in order) and bars-line (bar and line series on one axis).
+type Chart struct {
+	Key    string   `json:"key"`
+	Label  string   `json:"label"`
+	Kind   string   `json:"kind"`
+	Unit   string   `json:"unit,omitempty"`
+	Series []Series `json:"series"`
 }
 
 // Reading is one parsed status document.
@@ -46,6 +68,7 @@ type Reading struct {
 	Summary  string    `json:"summary"`
 	Items    []Item    `json:"items"`
 	Findings []Finding `json:"findings"`
+	Charts   []Chart   `json:"charts"`
 }
 
 // Source is one configured command's latest good reading plus how its recent runs went.
@@ -67,7 +90,53 @@ type Snapshot struct {
 	Sources []Source `json:"sources"`
 }
 
-var statuses = map[string]bool{"ok": true, "warn": true, "crit": true, "unknown": true}
+var (
+	statuses    = map[string]bool{"ok": true, "warn": true, "crit": true, "unknown": true}
+	chartKinds  = map[string]string{"stacked-area": "area", "bars-line": "bar"}
+	seriesKinds = map[string]bool{"area": true, "bar": true, "line": true}
+	colorRe     = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
+)
+
+// charts keeps well-formed charts only; a malformed chart is dropped rather than failing the whole reading.
+func charts(raw []Chart) []Chart {
+	out := []Chart{}
+	for _, c := range raw {
+		if len(out) == maxCharts {
+			break
+		}
+		def, ok := chartKinds[c.Kind]
+		if !ok || len(c.Series) == 0 {
+			continue
+		}
+		ch := Chart{Key: clip(c.Key, 40), Label: clip(c.Label, 40), Kind: c.Kind, Unit: clip(c.Unit, 16), Series: []Series{}}
+		for _, sr := range c.Series {
+			if len(ch.Series) == maxSeries {
+				break
+			}
+			kind := sr.Kind
+			if kind == "" || c.Kind == "stacked-area" {
+				kind = def
+			}
+			if !seriesKinds[kind] {
+				continue
+			}
+			color := ""
+			if colorRe.MatchString(sr.Color) {
+				color = strings.ToLower(sr.Color)
+			}
+			pts := sr.Points
+			if len(pts) > maxPoints {
+				pts = pts[len(pts)-maxPoints:]
+			}
+			if pts == nil {
+				pts = [][2]float64{}
+			}
+			ch.Series = append(ch.Series, Series{Name: clip(sr.Name, 24), Kind: kind, Color: color, Points: pts})
+		}
+		out = append(out, ch)
+	}
+	return out
+}
 
 func clip(s string, n int) string {
 	s = strings.Map(func(r rune) rune {
@@ -105,6 +174,7 @@ func Parse(stdout []byte, exitCode int, now time.Time) (Reading, error) {
 		Summary  string    `json:"summary"`
 		Items    []Item    `json:"items"`
 		Findings []Finding `json:"findings"`
+		Charts   []Chart   `json:"charts"`
 	}
 	if err := json.Unmarshal(stdout, &raw); err != nil || raw.Schema != Schema {
 		return Reading{}, errInvalid
@@ -125,8 +195,9 @@ func Parse(stdout []byte, exitCode int, now time.Time) (Reading, error) {
 		if len(r.Items) == maxItems {
 			break
 		}
-		r.Items = append(r.Items, Item{Key: clip(it.Key, 40), Label: clip(it.Label, 32), Status: normStatus(it.Status), Value: clip(it.Value, 24), Detail: clip(it.Detail, 48)})
+		r.Items = append(r.Items, Item{Key: clip(it.Key, 40), Label: clip(it.Label, 32), Status: normStatus(it.Status), Value: clip(it.Value, 24), Detail: clip(it.Detail, 48), Series: clip(it.Series, 24)})
 	}
+	r.Charts = charts(raw.Charts)
 	r.Findings = []Finding{}
 	for _, f := range raw.Findings {
 		if len(r.Findings) == maxFindings {
@@ -289,12 +360,12 @@ func (c *Collector) Snapshot(now time.Time) Snapshot {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, cfgSrc := range srcs {
-		s := Source{ID: cfgSrc.ID, Label: cfgSrc.Label, Reading: Reading{Status: "unknown", Items: []Item{}, Findings: []Finding{}}}
+		s := Source{ID: cfgSrc.ID, Label: cfgSrc.Label, Reading: Reading{Status: "unknown", Items: []Item{}, Findings: []Finding{}, Charts: []Chart{}}}
 		if st := c.state[cfgSrc.ID]; st != nil {
 			s = st.src
 			s.Label = cfgSrc.Label
 			if !s.HasReading {
-				s.Reading = Reading{Status: "unknown", Items: []Item{}, Findings: []Finding{}}
+				s.Reading = Reading{Status: "unknown", Items: []Item{}, Findings: []Finding{}, Charts: []Chart{}}
 			}
 		}
 		limit := 2*time.Duration(cfgSrc.IntervalSeconds)*time.Second + time.Duration(cfgSrc.TimeoutSeconds)*time.Second

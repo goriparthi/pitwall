@@ -68,12 +68,14 @@ type Action struct {
 
 // Layout is a dashboard template: grid columns and the widget in each slot.
 type Layout struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Columns  []string `json:"columns"`
-	Slots    []string `json:"slots"`
-	Focus    bool     `json:"focus,omitempty"`
-	Requires string   `json:"requires,omitempty"` // an integration; the layout is hidden when it is absent
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	Columns []string `json:"columns"`
+	Slots   []string `json:"slots"`
+	Focus   bool     `json:"focus,omitempty"`
+	// Standalone pages show only their widgets: no agent pill, limits chip, agent feed or waiting border.
+	Standalone bool   `json:"standalone,omitempty"`
+	Requires   string `json:"requires,omitempty"` // an integration; the layout is hidden when it is absent
 }
 
 // Integrations are optional data sources. "auto" turns one on only when it is found on this machine.

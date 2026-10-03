@@ -6,7 +6,7 @@ var BuiltinLayouts = []Layout{
 	{ID: "agents", Name: "Agents", Columns: []string{"1240px", "228px", "1fr"}, Slots: []string{"ai", "health-mini", "launcher"}},
 	{ID: "focus", Name: "Focus", Columns: []string{"1240px", "228px", "1fr"}, Slots: []string{"ai", "health-mini", "launcher"}, Focus: true},
 	{ID: "ai-desk", Name: "AI desk", Columns: []string{"868px", "600px", "1fr"}, Slots: []string{"ai", "limits", "launcher"}, Requires: "redline"},
-	{ID: "ops-desk", Name: "Ops desk", Columns: []string{"868px", "600px", "1fr"}, Slots: []string{"ai", "ops", "launcher"}, Requires: "ops"},
+	{ID: "ops-desk", Name: "Ops desk", Columns: []string{"1fr"}, Slots: []string{"ops"}, Requires: "ops", Standalone: true},
 	{ID: "usage", Name: "AI usage", Columns: []string{"600px", "1fr"}, Slots: []string{"limits", "usage"}},
 	{ID: "system", Name: "System", Columns: []string{"1474px", "1fr"}, Slots: []string{"system", "launcher"}},
 	{ID: "monitor", Name: "Monitor", Columns: []string{"800px", "1fr"}, Slots: []string{"health", "system"}},

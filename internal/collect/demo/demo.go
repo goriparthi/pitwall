@@ -4,8 +4,8 @@ package demo
 import (
 	"fmt"
 	"math"
-	"sort"
 	"math/rand/v2"
+	"sort"
 	"sync"
 	"time"
 )
@@ -145,23 +145,60 @@ func (s *Source) Limits() M {
 	}
 }
 
-// Ops mirrors the ops integration's shape: one pipeline with a warning on the message queue.
+// Ops mirrors the ops integration's shape: a file pipeline with a carrier backlog, type cards and two charts.
 func (s *Source) Ops() M {
 	n := time.Now()
-	item := func(key, label, status, value, detail string) M {
-		return M{"key": key, "label": label, "status": status, "value": value, "detail": detail}
+	item := func(key, label, series, status, value, detail string) M {
+		return M{"key": key, "label": label, "series": series, "status": status, "value": value, "detail": detail}
+	}
+	start := time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, n.Location())
+	depth := func(peak float64, at float64) [][2]float64 {
+		pts := [][2]float64{}
+		for t := start; t.Before(n); t = t.Add(5 * time.Minute) {
+			h := t.Sub(start).Hours()
+			v := 0.0
+			if d := h - at; d > 0 {
+				v = peak * math.Min(1, d/1.5) * math.Max(0, 1-math.Max(0, d-2.5)/3)
+			}
+			pts = append(pts, [2]float64{float64(t.UnixMilli()), math.Round(v)})
+		}
+		return pts
+	}
+	hourly := func(base, swing float64) [][2]float64 {
+		pts := [][2]float64{}
+		for i := 11; i >= 0; i-- {
+			t := n.Truncate(time.Hour).Add(-time.Duration(i) * time.Hour)
+			pts = append(pts, [2]float64{float64(t.UnixMilli()), math.Round(base + swing*math.Sin(float64(i)/2))})
+		}
+		return pts
 	}
 	return M{"present": true, "sources": []M{{
 		"id": "pipeline", "label": "Ingest pipeline", "status": "warn", "hasReading": true,
-		"asOf": n.Add(-90 * time.Second).UnixMilli(), "checkedAt": n.Add(-80 * time.Second).UnixMilli(), "lastOkAt": n.Add(-80 * time.Second).UnixMilli(),
-		"summary": "queue drain slower than usual", "failures": 0, "stale": false, "failing": false,
+		"asOf": n.Add(-20 * time.Second).UnixMilli(), "checkedAt": n.Add(-15 * time.Second).UnixMilli(), "lastOkAt": n.Add(-15 * time.Second).UnixMilli(),
+		"summary": "1,240 files queued · DB 42% busy today", "failures": 0, "stale": false, "failing": false,
 		"items": []M{
-			item("ingest", "File ingest", "ok", "14 today", "last 6m ago"),
-			item("queue", "File queue", "ok", "2 pending", "oldest 1m"),
-			item("loader", "Loader", "ok", "1 running", "p95 pickup 40s"),
-			item("drain", "Queue drain", "warn", "2.4k waiting", "oldest 18m"),
+			item("voter", "Voter", "Voter", "ok", "0", "clear"),
+			item("tracking", "Tracking", "Tracking", "ok", "12", "oldest 3m"),
+			item("eligibility", "Eligibility", "Eligibility", "ok", "2", "oldest 6m"),
+			item("carrier", "Carrier", "Carrier", "warn", "1,226", "oldest 24m"),
+			item("pending", "Pending", "", "warn", "1,240", "oldest 24m"),
+			item("clear", "To clear", "", "warn", "38m", "at the 30 day pace"),
+			item("loading", "Loader", "", "ok", "Carrier", "Example County, CO"),
+			item("util", "DB busy today", "", "ok", "42%", "58% headroom"),
 		},
-		"findings": []M{{"status": "warn", "text": "Message queue oldest item is 18m old (warn at 15m)"}},
+		"charts": []M{
+			{"key": "depth", "label": "Queue depth · today", "kind": "stacked-area", "unit": "files", "series": []M{
+				{"name": "Voter", "color": "#3987e5", "points": depth(0, 0)},
+				{"name": "Tracking", "color": "#199e70", "points": depth(40, 6)},
+				{"name": "Eligibility", "color": "#9085e9", "points": depth(15, 9)},
+				{"name": "Carrier", "color": "#d95926", "points": depth(1300, 10)},
+			}},
+			{"key": "flow", "label": "Received vs processed · 12h", "kind": "bars-line", "unit": "files/h", "series": []M{
+				{"name": "Received", "kind": "bar", "points": hourly(420, 260)},
+				{"name": "Processed", "kind": "line", "points": hourly(380, 120)},
+			}},
+		},
+		"findings": []M{{"status": "warn", "text": "Carrier: 1226 queued, oldest 24m, about 38m to clear"}},
 	}}}
 }
 

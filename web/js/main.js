@@ -91,7 +91,7 @@ function render() {
   if (builtLayout !== key) buildSlots(layout);
   panel.className = `panel layout-${layout.id}`;
   const agents = viewAgents({ ...s, ui: { ...s.ui, focus: s.ui.focus || layout.focus } });
-  if (agents.some((a) => a.status === 'waiting')) panel.classList.add('has-wait');
+  if (!layout.standalone && agents.some((a) => a.status === 'waiting')) panel.classList.add('has-wait');
   setPanelFps(agents.some((a) => a.status === 'working' || a.status === 'waiting'));
   const widths = columnWidths(layout.columns);
   const ctx = { state: s, agents, now, flash: flash && now - flash.at < 1500 ? flash : null };
@@ -104,7 +104,7 @@ function render() {
     }
   });
   renderHeader($('hdr'), s, now, agents, layout);
-  renderFooter($('ftr'), s, agents);
+  renderFooter($('ftr'), s, agents, layout);
   if (view === 'full') renderControls(s);
 }
 

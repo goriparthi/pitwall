@@ -42,6 +42,21 @@ func TestParse(t *testing.T) {
 		t.Errorf("caps not applied: %d items, summary %d", len(r.Items), len([]rune(r.Summary)))
 	}
 
+	withCharts := `{"schema":"pitwall.status/1","charts":[
+		{"key":"depth","label":"Queue","kind":"stacked-area","series":[{"name":"A","kind":"line","color":"#ABCDEF","points":[[1,2],[3,4]]},{"name":"B","color":"red","points":[]}]},
+		{"key":"bad","kind":"pie","series":[{"name":"x","points":[[1,1]]}]},
+		{"key":"flow","kind":"bars-line","series":[{"name":"In","kind":"bar","points":[[1,5]]},{"name":"Out","kind":"line","points":[[1,4]]},{"name":"?","kind":"spline"}]}]}`
+	r, err = Parse([]byte(withCharts), 0, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Charts) != 2 || r.Charts[0].Series[0].Kind != "area" || r.Charts[0].Series[0].Color != "#abcdef" || r.Charts[0].Series[1].Color != "" {
+		t.Errorf("stacked-area forces areas and only hex colors pass: %+v", r.Charts)
+	}
+	if f := r.Charts[1]; f.Key != "flow" || len(f.Series) != 2 || f.Series[1].Kind != "line" {
+		t.Errorf("unknown chart and series kinds are dropped: %+v", f)
+	}
+
 	for name, c := range map[string]struct {
 		doc  string
 		code int

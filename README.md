@@ -70,7 +70,7 @@ Pitwall can show the health of something you run, such as a data pipeline, from 
   "intervalSeconds": 120, "timeoutSeconds": 30 } ] }
 ```
 
-The command is an argument list, never a shell line. `command[0]` must be an absolute path to an existing file that other users can't write to, and on Windows it can't be a batch or PowerShell script. Intervals run from 30 to 3600 seconds and the timeout from 5 to 120, below the interval. Up to 4 sources; the widget shows the first in full and the rest as one line each.
+The command is an argument list, never a shell line. `command[0]` must be an absolute path to an existing file that other users can't write to, and on Windows it can't be a batch or PowerShell script. Intervals run from 30 to 3600 seconds and the timeout from 5 to 120, below the interval. Up to 4 sources; the widget shows the first in full and the rest as one line each. In a full width slot the widget becomes a desk: up to 8 cards plus the charts. A layout with `"standalone": true` (the built-in Ops desk is one) shows only its widgets, with no agent pill, plan chip, agent feed or waiting border.
 
 The command prints one document on stdout:
 
@@ -82,6 +82,8 @@ The command prints one document on stdout:
   "items": [ { "key": "queue", "label": "File queue", "status": "ok", "value": "12 pending", "detail": "oldest 2m" } ],
   "findings": [ { "status": "warn", "text": "Oldest message is 18m old (warn at 15m)" } ] }
 ```
+
+Optional extras: an item's `series` names a chart series, and the panel shows that series' color as the item's swatch. `charts` (up to 3) draws time series in a wide slot: `"kind": "stacked-area"` stacks every series, and `"bars-line"` mixes `"kind": "bar"` and `"line"` series on one axis. Each series has a `name`, an optional `#RRGGBB` `color`, and `points` as `[epoch ms, value]` pairs, oldest first (up to 400 kept).
 
 `status` is `ok`, `warn`, `crit` or `unknown`. Without it, exit codes 0, 1 and 2 mean ok, warn and crit. `asOf` defaults to when the command ran. The panel shows the first 4 items and the first 2 findings that aren't ok. Keep `value` short (about 12 characters) and put words in `detail`. Any other exit code, a timeout, more than 64 KB of output, or output that isn't this JSON counts as a failed read, not a pipeline status: the last good reading stays up, dimmed and marked stale, and after three failed reads in a row the widget says there is no reading. A failed read never shows red or lights the LED. On timeout Pitwall stops the command and everything it started (on Windows, only the command itself). Stderr goes to the log, truncated, never to the panel. Privacy mode hides details, findings and the summary.
 
