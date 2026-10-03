@@ -1,4 +1,7 @@
-<img src="assets/brand/lockup-light.svg" alt="pitwall" height="48">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/dial-lockup-light.svg">
+  <img src="assets/brand/dial-lockup-dark.svg" alt="pitwall" height="56">
+</picture>
 
 **Your setup. In view.** A personal command center, built from templates.
 
@@ -28,7 +31,7 @@ Requirements: Go 1.26+. On macOS, Homebrew `libusb` at build time (it is linked 
 
 ## Brand
 
-Brand assets and tokens live in `assets/` (from the Pitwall brand kit v1.0): wordmarks and lockups, macOS/Windows/web icons, `design/tokens.json`, the component spec and the implementation guide. The UI reads its colors from those tokens. Status colors are semantic and never the lime accent. The panel shows no tappable-looking controls, and motion is limited to states backed by telemetry. The Windows `.exe` icon comes from `cmd/pitwall/rsrc_windows_*.syso` (regenerate with `go run github.com/tc-hib/go-winres@latest simply --icon assets/icons/windows/icon-256.png` in that folder).
+The mark is the Dial: a split ring with an orange needle (`assets/brand/dial-*.svg`), paired with the kit's drawn wordmark. `scripts/brand/dial.py` generates the vectors and `scripts/brand/build-icons.sh` rebuilds every raster (macOS `.icns` and menu bar template, Windows `.ico`, web icons) from them. Orange belongs to the logo only; the UI accent stays Pit Lime so amber keeps meaning "waiting". Tokens, the component spec and the implementation guide from the brand kit v1.0 are in `assets/design/`. The UI reads its colors from those tokens. Status colors are semantic and never the lime accent. The panel shows no tappable-looking controls, and motion is limited to states backed by telemetry. The Windows `.exe` icon comes from `cmd/pitwall/rsrc_windows_*.syso` (regenerate with `go run github.com/tc-hib/go-winres@latest simply --icon assets/icons/windows/icon-256.png` in that folder).
 
 ## Templates and customization
 
