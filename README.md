@@ -1,164 +1,189 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/dial-lockup-light.svg">
-    <img src="assets/brand/dial-lockup-dark.svg" alt="pitwall" height="64">
+    <img src="assets/brand/dial-lockup-dark.svg" alt="pitwall" height="60">
   </picture>
 </p>
 
-<h3 align="center">Your setup. In view.</h3>
-
 <p align="center">
-  A personal command center for your AI agents and your machine, on a dedicated display.<br>
-  <a href="https://goriparthi.github.io/pitwall/"><b>Website</b></a> ·
+  <a href="https://goriparthi.github.io/pitwall/">Website</a> ·
   <a href="#get-started">Get started</a> ·
-  <a href="#templates">Templates</a> ·
-  <a href="#whats-real">What's real</a>
+  <a href="#how-a-dashboard-fits-together">Templates and config</a> ·
+  <a href="#compatibility">Compatibility</a>
 </p>
 
-<p align="center">
-  <img alt="macOS" src="https://img.shields.io/badge/macOS-supported-77D9A0?style=flat-square&labelColor=141C22">
-  <img alt="Windows" src="https://img.shields.io/badge/Windows-early-FFD076?style=flat-square&labelColor=141C22">
-  <img alt="Go" src="https://img.shields.io/badge/Go-1.26-75C7FF?style=flat-square&labelColor=141C22">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-D5FF45?style=flat-square&labelColor=141C22">
-</p>
+Pitwall is a dashboard for the screen beside your monitor. It shows CPU, memory, network and disk, the Claude Code sessions you have running, and shortcuts to the tools you open most. You pick a template and it fills in with live data from your computer. It drives the Lian Li 8.8" Universal Screen over USB, or runs in a browser window if you don't have one.
 
-![Pitwall in motion: agents working, an approval request turning the panel amber, a task finishing, and a tour of layouts](site/img/pitwall-demo.gif)
+**Status:** early development. Works on macOS today; Windows builds are in testing. There's no installer yet. MIT licensed.
 
-<sub>Recorded from a real build at the Lian Li 8.8" Universal Screen's native 1920 x 480, running Pitwall's labelled demo story.</sub>
+![Recording of Pitwall: agents working, one asking to approve a command, another finishing, then a switch between templates](site/img/pitwall-demo.gif)
 
-Pitwall turns a dedicated display, starting with the **Lian Li 8.8" Universal Screen** (US88, SM088X), into a glanceable view of your **Claude Code agents**, your **machine** and your **shortcuts**. When an agent needs you, you see it before you go looking. One Go binary for macOS and Windows; everything stays on your machine.
+<sub>Recorded from Pitwall's demo mode at the display's native 1920 x 480. Names and numbers are demo data.</sub>
 
-## Highlights
+## The default layout
 
-- **Attention you can't miss.** When a session asks for approval, asks a question or fails, the panel header turns into an amber alert and the screen edge glows. The LED ring breathes amber, and the menu bar shows `▲ 1`.
-- **Agents at a glance.** Every Claude Code session as working, waiting, done, failed or idle, with its task title, latest tool, elapsed time, context size and measured tokens.
-- **Machine health.** CPU, memory, network and disk with short trends, plus GPU, battery and the busiest processes.
-- **A safe launcher.** Open a terminal, editor or new Claude session in the current project. Only actions you list in config can run.
-- **Templates.** Six layouts out of the box, switchable with a number key; override or add your own in JSON.
-- **Private by default.** Loopback only, token protected, and hooks forward event names, never prompts, commands or output.
+Balanced is the template Pitwall starts with. From left to right:
 
-## Get started
+1. **Header.** The layout and project you're looking at. When an agent needs you, it turns into an amber alert saying who is waiting, for what, and for how long.
+2. **Agents.** One card per Claude Code session: status, time in that status, task title, latest tool, context size and output tokens.
+3. **Computer.** CPU with a 90 second trend, memory, network down and up, and free disk. GPU and battery sit in the label row.
+4. **Launcher.** Your shortcuts and their keys. The screen has no touch, so you run them from the menu bar or the desktop dashboard.
+5. **Footer.** Template tabs with their number keys, and either the attention count or the latest event.
 
-```sh
-git clone https://github.com/goriparthi/pitwall && cd pitwall
-scripts/build.sh                  # bin/pitwall, plus dist/: Pitwall.app, macOS arm64, Windows amd64/arm64
-bin/pitwall hooks install         # Claude Code hooks (backs up ~/.claude/settings.json first)
-bin/pitwall start                 # background: server, panel, LED ring, menu bar item, hotkeys
-```
+Values refresh on their own schedule, from every second for CPU to every 15 seconds for disk space.
 
-No screen yet? `bin/pitwall run --demo --no-display`, then open http://127.0.0.1:7788/?view=full.
+## Examples
 
-| Command | What it does |
+### A workstation or home server
+
+The Monitor template shows health and detail side by side: CPU per core with load averages, memory split into used, wired, compressed and swap, network throughput, free disk, and the busiest processes with their CPU and memory use. On macOS it adds GPU, battery and thermal state.
+
+![The Monitor template](site/img/panel-monitor.jpg)
+
+Not yet: checks on services (HTTP, ports, ping) and watching other machines. Both are planned.
+
+### Running coding agents
+
+With the Claude Code hooks installed, Pitwall hears about each session as it works. When one asks for approval, asks a question or fails:
+
+- the screen's header turns amber and its edge lights up
+- the display's LED ring breathes amber
+- the menu bar shows `▲ 1`
+
+![The Agents template, with one session waiting for approval](site/img/panel-agents.jpg)
+
+The AI usage template adds today's measured token totals and a row per running session. Ollama shows which models are loaded. Codex, Cursor and Claude Desktop are only detected as running, with no task detail. Not yet: cost, and task detail for agents other than Claude Code.
+
+## How a dashboard fits together
+
+| Term | What it is |
 | --- | --- |
-| `pitwall start` / `stop` / `status` | Run in the background and control it |
-| `pitwall open` | Full dashboard on the main monitor |
-| `pitwall run [--demo] [--no-display] [--no-tray]` | Run in the foreground |
-| `pitwall hooks install` / `uninstall` / `status` | Manage the Claude Code hook entries |
-| `pitwall selftest` | Fake "needs approval" session: amber alert and LED breathing, end to end |
-| `pitwall probe [led]` | Push an orientation frame, or blink the LED ring |
-| `pitwall config` | Print the config file path |
+| Template | A named grid of up to four widgets. Six ship with Pitwall: `balanced`, `agents`, `focus`, `usage`, `system`, `monitor`. |
+| Widget | One block of the screen: `ai`, `health`, `health-mini`, `launcher`, `usage`, `system`. |
+| Data source | Where the numbers come from. Today these are built in: your computer's own counters, Claude Code's session files and hooks, and Ollama's local API. Sources you add yourself are planned. |
+| Action | A launcher entry: a terminal or app opened in the selected project, or a URL. Only actions listed in the config can run. |
 
-**Requirements:** Go 1.26+ to build. Chrome, Edge or Brave for rendering (Edge ships with Windows). On macOS, Homebrew `libusb` at build time; it is linked statically, so the binary needs nothing at runtime. Windows builds need no cgo.
-
-## Driving it
-
-The panel has no touch, so nothing on it pretends to be a button. Drive it from anywhere:
-
-| macOS | Windows | Action |
-| --- | --- | --- |
-| `⌃⌥F` | `Ctrl+Alt+F` | Focus on working, waiting and failed agents |
-| `⌃⌥1` to `⌃⌥9` | `Ctrl+Alt+1` to `9` | Switch layout |
-| `⌃⌥H` | `Ctrl+Alt+H` | Privacy mode (hides names, projects and tasks) |
-| `⌃⌥R` | `Ctrl+Alt+R` | Rotate layouts |
-| `⌃⌥D` / `⌃⌥K` | `Ctrl+Alt+D` / `K` | Full dashboard / command palette |
-
-The menu bar (macOS) or tray (Windows) item lists your sessions, actions, layouts and projects. The full dashboard mirrors the panel with controls, an attention queue, a brightness slider and a ⌘K palette.
-
-![The full dashboard with the command palette open](site/img/dashboard-palette.jpg)
-
-## Templates
-
-| | |
-| --- | --- |
-| **Agents**: room for four sessions ![Agents template](site/img/panel-agents.jpg) | **AI usage**: today's measured tokens and turns ![AI usage template](site/img/panel-usage.jpg) |
-| **System**: per-core CPU, memory, processes ![System template](site/img/panel-system.jpg) | **Monitor**: health and system detail together ![Monitor template](site/img/panel-monitor.jpg) |
-
-Built-in layouts: `balanced` (default), `agents`, `focus`, `usage`, `system`, `monitor`. Each is a grid of up to four widget slots: `ai`, `health`, `health-mini`, `launcher`, `usage`, `system`.
-
-Edit the config (`pitwall config` prints its path; the menu has "Edit config…"). Changes apply within two seconds. Invalid edits are rejected and logged, and the previous config stays active.
+All of it lives in one JSON file; `pitwall config` prints its path. Pitwall rereads the file within two seconds. If an edit is invalid, it keeps the last working version and logs why.
 
 ```json
-"ui": { "layouts": ["balanced", "wide", "usage"] },
+"ui": { "layouts": ["balanced", "wide", "monitor"] },
 "layouts": [
   { "id": "wide", "name": "Wide agents", "columns": ["1300px", "1fr"], "slots": ["ai", "launcher"] }
+],
+"actions": [
+  { "id": "claude", "label": "Claude Code", "key": "c", "kind": "terminal", "app": "iTerm", "run": "claude" }
 ]
 ```
 
-A user layout with a built-in id overrides it; delete the entry to get the default back. `ui.layouts` sets the number-key order and the rotation cycle.
+`ui.layouts` sets which templates get number keys and the order they rotate in. A layout that reuses a built-in id replaces it; delete the entry to get the default back. Actions can carry `mac` and `windows` overrides. The `display` section sets frame rate, rotation, JPEG quality and brightness, and `led` controls the ring.
 
-The config has four other sections:
+## Get started
 
-- `projects`: the project switcher and the launcher's target.
-- `actions`: the only things the launcher can run (`terminal`, `open-app`, `open-url`), with optional `mac`/`windows` overrides.
-- `display`: `fps`, `rotation`, `jpegQuality`, `brightness`.
-- `led`: `enabled`, `maxBrightness`, `workingGlow`.
+There's no installer yet, so you build Pitwall with Go:
 
-## What's real
+```sh
+git clone https://github.com/goriparthi/pitwall && cd pitwall
+scripts/build.sh               # bin/pitwall, plus dist/: Pitwall.app and Windows builds
+bin/pitwall hooks install      # optional: Claude Code hooks, after backing up ~/.claude/settings.json
+bin/pitwall start              # runs in the background with a menu bar icon
+bin/pitwall open               # the desktop dashboard in your browser
+```
+
+No display? Try `bin/pitwall run --demo --no-display` and open http://127.0.0.1:7788/?view=full.
+
+You'll need Go 1.26 or newer, and Chrome, Edge or Brave, which renders the display. On macOS, Homebrew's `libusb` is needed at build time; it's linked in, so nothing extra is needed at run time. Windows builds don't need cgo.
+
+| Command | What it does |
+| --- | --- |
+| `pitwall start`, `stop`, `status` | Run in the background and control it |
+| `pitwall open` | Open the desktop dashboard |
+| `pitwall run [--demo] [--no-display] [--no-tray]` | Run in the foreground |
+| `pitwall hooks install`, `uninstall`, `status` | Manage the 12 Claude Code hook entries |
+| `pitwall selftest` | Fake an approval request to check the alert and LED ring end to end |
+| `pitwall probe [led]` | Push a test frame to the display, or blink the LED ring |
+| `pitwall config` | Print the config file path |
+
+## Using it
+
+The desktop dashboard mirrors the screen and adds what the screen can't have: template buttons, focus and privacy modes, a project filter, display brightness, and an attention list you can acknowledge.
+
+![The desktop dashboard in a browser](site/img/dashboard-desktop.jpg)
+
+The menu bar icon (a tray icon on Windows) lists your sessions, launcher actions, templates and projects. Hotkeys work from any app; on Windows they use Ctrl+Alt instead of ⌃⌥.
+
+| Keys | Action |
+| --- | --- |
+| `⌃⌥1` to `⌃⌥9` | Switch template |
+| `⌃⌥F` | Show only working, waiting and failed agents |
+| `⌃⌥H` | Hide session names, projects and tasks |
+| `⌃⌥R` | Rotate through templates |
+| `⌃⌥D`, `⌃⌥K` | Desktop dashboard, command palette |
+
+## Compatibility
+
+| Area | Item | Status | Notes |
+| --- | --- | --- | --- |
+| System | macOS, Apple silicon | Works | Tested on macOS 26 |
+| System | Windows 10 and 11 | In testing | Builds for x64 and ARM; not yet run on real hardware |
+| System | Linux | Not supported | |
+| Display | Lian Li 8.8" Universal Screen | Works on macOS | Over USB, including its LED ring; no firmware changes |
+| Display | Any monitor | Works | The desktop dashboard in a browser window |
+| Display | Other USB displays | Not supported | Display output is a separate module, so others can be added |
+| Data | CPU, memory, disk, network, processes, battery | Works | macOS; the Windows versions are written but untested |
+| Data | GPU and thermal state | macOS only | Temperatures need root and aren't read |
+| Data | Claude Code | Works | Status, approvals, failures, measured tokens |
+| Data | Ollama | Works | Which models are loaded |
+| Data | Codex, Cursor, Claude Desktop | Detected only | Shown as running; no task detail |
+| Planned | Service checks, cost, installers | Planned | Also Codex session detail and starting at login |
+
+## Privacy and security
+
+Pitwall listens on 127.0.0.1 only and checks the Host header to block DNS rebinding. Every change request needs a per-install token, which is kept in a file only you can read and placed in the page Pitwall serves, plus a same-origin Origin header. Request bodies are capped at 16 KB and actions are rate limited.
+
+The hook forwarder sends event names, tool names and file basenames, never prompts, commands or output. Transcripts are read for the `usage` and `ai-title` fields only. State and logs live in `~/.local/state/pitwall` on macOS and `%LOCALAPPDATA%\pitwall` on Windows.
 
 | Data | Source |
 | --- | --- |
-| Sessions, busy/idle | `~/.claude/sessions/*.json`, written by Claude Code (undocumented, read only) |
-| Approval waits, questions, failures, tool activity | Claude Code hooks; only event name, tool and file basename are forwarded |
-| Task title, tokens, context | transcript `ai-title` and `usage` fields; message content is not decoded |
-| Cost | not shown; no reliable local source yet |
-| Codex, Cursor, Claude Desktop | process presence only: "running; task status unavailable" |
-| Ollama | local API, loaded models |
-| CPU, memory, disk, network, processes | macOS tools, gopsutil on Windows |
-| GPU, thermal | macOS only for now; die temperatures need root and are not collected |
+| Sessions, busy and idle | `~/.claude/sessions/*.json`, written by Claude Code (undocumented, read only) |
+| Approvals, questions, failures, tool activity | Claude Code hooks |
+| Task title, tokens, context size | Transcript `ai-title` and `usage` fields |
+| Codex, Cursor, Claude Desktop | Process names only |
+| Ollama | Its local API |
+| System metrics | macOS tools; gopsutil on Windows |
 
-## How it works
+## How it's built
 
 ```
-internal/collect/{system,claude,tools,demo}   telemetry (OS specifics in *_darwin.go / *_windows.go)
-internal/server                                loopback API, SSE, embedded web UI (web/)
-internal/display/bridge                        headless Chromium screencast of ?view=panel -> JPEG
-internal/display/{us88,ledring}                device protocols over internal/usb (libusb on macOS, WinUSB on Windows)
-internal/display/lights                        LED attention policy
-internal/tray                                  menu bar / tray + global hotkeys
+internal/collect/{system,claude,tools,demo}   data sources (OS specifics in *_darwin.go and *_windows.go)
+internal/server                                loopback API, server-sent events, embedded web UI (web/)
+internal/display/bridge                        headless Chromium renders ?view=panel; frames go out as JPEG
+internal/display/{us88,ledring}                display and LED protocols over internal/usb (libusb on macOS, WinUSB on Windows)
+internal/display/lights                        what the LED ring shows
+internal/tray                                  menu bar and tray icon, global hotkeys
 internal/hooks                                 Claude Code hook forwarder and installer
 ```
 
-The UI is a web page that the bridge only captures, so another screen needs only a new transport.
+The dashboard is a web page, and the display output only captures it, so supporting another screen means writing another output module.
 
-**Hardware.** The screen enumerates as USB `1cbe:a088` and the LED ring as `0416:8050`. The frame protocol follows the open source [lian-li-linux](https://github.com/sgtaziz/lian-li-linux) driver. No firmware is modified, nothing is saved to the device, and the vendor "desktop mode" switch is not used. If the panel stops taking frames, Pitwall reconnects with backoff; if it stays stuck, unplug and replug the screen. Never USB-reset it, because a reset takes it off the bus until it is power cycled.
+**The Lian Li display.** It shows up as USB `1cbe:a088` and its LED ring as `0416:8050`. The frame protocol follows the open source [lian-li-linux](https://github.com/sgtaziz/lian-li-linux) driver. Pitwall never modifies firmware, never saves anything to the device, and doesn't use the vendor's "desktop mode". If the display stops taking frames, Pitwall reconnects. If it stays stuck, unplug it and plug it back in. Don't USB-reset it: a reset takes it off the bus until it's power cycled.
 
-**Windows (early).** Builds and passes static checks, but is unverified on hardware. It assumes Windows binds the WinUSB driver to the screen and ring, which the vendor driver's naming suggests. Quit L-Connect first, because it holds the devices, then run `pitwall probe`.
+**Windows.** It assumes Windows binds the WinUSB driver to the display and ring, which the vendor driver's naming suggests. Quit L-Connect first, because it holds the devices, then run `pitwall probe`.
 
-**Security.** Binds to 127.0.0.1 only and checks the Host header against DNS rebinding. Every POST needs the per-install token (0600, inlined into the served page) and a same-origin Origin. Request bodies are capped at 16 KB and actions are rate limited. State and logs live in `~/.local/state/pitwall` (macOS) or `%LOCALAPPDATA%\pitwall` (Windows).
-
-**Resource use.** On an M3 Pro, about 15 to 17% of one core while an agent is working (6 fps) and roughly half that when calm (2 fps), measured by process CPU time. Most of it is the headless renderer; the Go process is about 3 to 5%.
+**Resource use.** On an M3 Pro, about 15 to 17% of one CPU core while an agent is working (6 fps), and roughly half that when everything is idle (2 fps). Most of it is the headless renderer; Pitwall itself uses 3 to 5%.
 
 ## Brand
 
-The mark is the Dial: a split ring with an orange needle, paired with the brand kit's drawn wordmark. `scripts/brand/dial.py` generates the vectors, and `scripts/brand/build-icons.sh` rebuilds every icon from them: the macOS `.icns` and menu bar template, the Windows `.ico`, and the web icons. Orange belongs to the logo only. The UI accent stays Pit Lime so that amber always means "waiting", and status colors are never the accent. Tokens, the component spec and the implementation guide live in `assets/design/`. The Windows `.exe` icon comes from `cmd/pitwall/rsrc_windows_*.syso`; regenerate it with `go run github.com/tc-hib/go-winres@latest simply --icon assets/icons/windows/icon-256.png` in that folder.
+The mark is the Dial, paired with the brand kit's drawn wordmark. `scripts/brand/dial.py` generates the vectors, and `scripts/brand/build-icons.sh` rebuilds every icon from them. Orange is reserved for the logo and the website's actions. Inside the app, the accent stays lime so that amber always means "waiting". Tokens and the component spec are in `assets/design/`.
 
 ## Development
 
 ```sh
-PKG_CONFIG=$PWD/scripts/pkg-config go test ./...    # the pkg-config shim links static libusb on macOS
+PKG_CONFIG=$PWD/scripts/pkg-config go test ./...   # the pkg-config shim links libusb statically on macOS
 GOOS=windows go vet ./...
-PITWALL_PPROF=127.0.0.1:6060 bin/pitwall run        # profiling
+scripts/capture-demo.sh                            # re-record the README GIF and website video
 ```
 
-The website lives in `site/` and deploys to GitHub Pages on every push that changes it.
-
-## Next
-
-1. Verify Windows on real hardware.
-2. Exact session cost from the Claude Code status line.
-3. Codex session telemetry from `~/.codex/sessions`.
-4. Windows GPU and thermal metrics.
-5. Signed releases and an opt-in start at login.
+The website lives in `site/` and deploys to GitHub Pages when it changes.
 
 ## License
 
