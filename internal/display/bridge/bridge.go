@@ -135,7 +135,10 @@ func (b *Bridge) Run(ctx context.Context) error {
 	defer cancelChrome()
 
 	url := fmt.Sprintf("%s/?view=panel&rotate=%d&fps=%d", b.Base, cfg.Rotation, cfg.FPS)
-	if err := chromedp.Run(cctx, chromedp.EmulateViewport(int64(w), int64(h)), chromedp.Navigate(url)); err != nil {
+	// Every load drops the viewport override, and screencast then captures the clamped window (500x1777 for
+	// 480x1920) scaled down, cutting off the far end; so the override is applied after each load.
+	view := chromedp.EmulateViewport(int64(w), int64(h))
+	if err := chromedp.Run(cctx, chromedp.Navigate(url), view); err != nil {
 		b.report("error", map[string]any{"error": "renderer failed: " + err.Error()})
 		return err
 	}
@@ -231,7 +234,7 @@ func (b *Bridge) Run(ctx context.Context) error {
 			}
 			// the page may have lost its stream after a renderer hiccup; reload if nothing was sent for 30 s
 			if time.Since(time.UnixMilli(lastSent.Load())) > 30*time.Second {
-				_ = chromedp.Run(cctx, chromedp.Reload())
+				_ = chromedp.Run(cctx, chromedp.Reload(), view)
 				lastSent.Store(time.Now().UnixMilli())
 			}
 		}

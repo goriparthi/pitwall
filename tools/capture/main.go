@@ -77,7 +77,7 @@ func main() {
 	defer cancelA()
 	ctx, cancel := chromedp.NewContext(actx)
 	defer cancel()
-	check(chromedp.Run(ctx, chromedp.EmulateViewport(1920, 480), chromedp.Navigate(fmt.Sprintf("%s/?view=panel&fps=%d", base, *fps))))
+	check(chromedp.Run(ctx, chromedp.Navigate(fmt.Sprintf("%s/?view=panel&fps=%d", base, *fps)), chromedp.EmulateViewport(1920, 480)))
 	time.Sleep(2 * time.Second) // story time ~2 s at the first frame
 
 	check(os.MkdirAll(*out, 0o755))
