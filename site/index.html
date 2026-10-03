@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pitwall · Your setup. In view.</title>
+<meta name="description" content="Pitwall turns a dedicated display into a glanceable view of your Claude Code agents, your machine and your shortcuts. Open source, local only, macOS and Windows.">
+<meta name="theme-color" content="#0B1014">
+<link rel="icon" href="brand/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="brand/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="brand/icon-192.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Pitwall · Your setup. In view.">
+<meta property="og:description" content="A personal command center for your AI agents and your machine, on a dedicated display.">
+<meta property="og:image" content="https://goriparthi.github.io/pitwall/img/social-card.jpg">
+<meta property="og:url" content="https://goriparthi.github.io/pitwall/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://goriparthi.github.io/pitwall/img/social-card.jpg">
+<style>
+:root {
+  --canvas: #0B1014; --surface: #141C22; --raised: #1C272F; --border: #34434E;
+  --text: #F3F5EF; --text-2: #B1BFC7; --text-3: #83959F;
+  --lime: #D5FF45; --lime-ink: #10171C; --orange: #F26B2A;
+  --info: #75C7FF; --ok: #77D9A0; --warn: #FFD076; --bad: #FF8E87;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--canvas); color: var(--text); font-family: var(--font); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+img { max-width: 100%; height: auto; display: block; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--info); outline-offset: 4px; border-radius: 4px; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+.eyebrow { font: 13px/1.4 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--text-2); }
+.lead { font-size: clamp(18px, 2.1vw, 22px); color: var(--text-2); max-width: 640px; }
+h1, h2, h3 { margin: 0; letter-spacing: -.03em; }
+h2 { font-size: clamp(32px, 4.4vw, 48px); line-height: 1.08; margin: 14px 0 16px; }
+h3 { font-size: 20px; letter-spacing: -.01em; }
+section { padding: 96px 0; }
+.btn { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 12px 22px; border-radius: 8px; border: 1px solid var(--border); background: var(--raised); color: var(--text); text-decoration: none; font-weight: 600; transition: border-color 120ms, transform 120ms; }
+.btn:hover { border-color: #4A5D6A; transform: translateY(-1px); }
+.btn.primary { background: var(--lime); border-color: var(--lime); color: var(--lime-ink); }
+.btn.primary:hover { border-color: var(--lime); filter: brightness(1.04); }
+
+/* nav */
+nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--canvas) 86%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); }
+nav .wrap { display: flex; align-items: center; gap: 28px; height: 68px; }
+nav .logo img { height: 30px; width: auto; }
+nav .links { margin-left: auto; display: flex; gap: 26px; font-size: 15px; }
+nav .links a { color: var(--text-2); text-decoration: none; }
+nav .links a:hover { color: var(--text); }
+
+/* hero */
+.hero { padding: 72px 0 40px; position: relative; overflow: hidden; }
+.hero .wrap { display: grid; grid-template-columns: 1.25fr .75fr; gap: 40px; align-items: center; }
+.hero h1 { font-size: clamp(52px, 8vw, 96px); line-height: 1.02; letter-spacing: -.035em; margin: 18px 0 22px; }
+.hero h1 span { color: var(--lime); }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin: 30px 0 22px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font: 13px var(--mono); color: var(--text-3); letter-spacing: .06em; text-transform: uppercase; }
+.meta b { color: var(--text-2); font-weight: 500; }
+.dial { width: 100%; max-width: 420px; justify-self: center; filter: drop-shadow(0 30px 60px rgba(242, 107, 42, .12)); }
+.dial .needle { transform-origin: 100px 100px; animation: sweep 6s cubic-bezier(.45, 0, .2, 1) infinite; }
+.dial .tick { stroke: var(--border); stroke-width: 2; }
+.dial .tick.hot { stroke: var(--text-3); }
+@keyframes sweep { 0%, 100% { transform: rotate(-10deg); } 45% { transform: rotate(4deg); } 60% { transform: rotate(2deg); } }
+
+/* device showcase */
+.device { margin: 56px auto 0; max-width: 1248px; padding: 0 24px; position: relative; }
+.device .bezel { background: linear-gradient(180deg, #1a2026, #0d1114); border-radius: 18px; padding: 14px; box-shadow: 0 0 0 1px #2a333b, 0 40px 120px -30px rgba(0, 0, 0, .9), 0 0 0 7px #0a0d10, 0 0 0 8px #262e35; }
+.device .bezel img { border-radius: 6px; width: 100%; aspect-ratio: 4 / 1; object-fit: cover; }
+.device::after { content: ""; position: absolute; left: 10%; right: 10%; bottom: -60px; height: 80px; background: radial-gradient(closest-side, rgba(213, 255, 69, .10), transparent); pointer-events: none; }
+.caption { text-align: center; color: var(--text-3); font-size: 14px; margin-top: 26px; }
+
+/* attention */
+.channels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+.chan { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 26px; display: flex; flex-direction: column; gap: 14px; }
+.chan p { margin: 0; color: var(--text-2); }
+.chan .art { height: 150px; border-radius: 12px; background: var(--canvas); border: 1px solid #222c34; display: grid; place-items: center; overflow: hidden; position: relative; }
+.pill { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border-radius: 8px; font-size: 14px; max-width: calc(100% - 24px); white-space: nowrap; background: color-mix(in srgb, var(--warn) 14%, var(--canvas)); border: 1px solid color-mix(in srgb, var(--warn) 55%, transparent); color: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 18%, transparent); }
+.pill b { color: var(--text); }
+.ring { width: 112px; height: 112px; border-radius: 50%; border: 10px solid var(--warn); animation: breathe 1.6s ease-in-out infinite; box-shadow: 0 0 40px color-mix(in srgb, var(--warn) 40%, transparent), inset 0 0 22px color-mix(in srgb, var(--warn) 30%, transparent); }
+@keyframes breathe { 50% { opacity: .35; box-shadow: 0 0 10px color-mix(in srgb, var(--warn) 20%, transparent); } }
+.menubar { width: 88%; height: 34px; border-radius: 8px; background: #E9E9EA; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 0 14px; color: #1d1d1f; font: 600 14px var(--font); }
+.menubar .me { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 5px; background: rgba(0, 0, 0, .08); }
+.menubar img { width: 18px; height: 18px; }
+.menubar .dim { color: #6e6e73; font-weight: 500; }
+.illus { position: absolute; bottom: 8px; right: 10px; font: 11px var(--mono); color: var(--text-3); letter-spacing: .08em; text-transform: uppercase; }
+
+/* features */
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+.feat { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 26px; }
+.feat .ico { width: 40px; height: 40px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border); display: grid; place-items: center; margin-bottom: 18px; color: var(--lime); }
+.feat p { color: var(--text-2); margin: 10px 0 0; }
+.feat code { font-family: var(--mono); font-size: 13px; color: var(--text); background: var(--raised); padding: 1px 6px; border-radius: 5px; }
+
+/* templates */
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 36px 0 22px; }
+.tabs button { font: inherit; font-size: 15px; color: var(--text-2); background: none; border: 1px solid var(--border); border-radius: 8px; padding: 9px 16px; cursor: pointer; min-height: 40px; }
+.tabs button .n { font-family: var(--mono); color: var(--text-3); margin-right: 6px; }
+.tabs button[aria-selected="true"] { color: var(--text); background: var(--raised); box-shadow: inset 0 -2px 0 var(--lime); }
+.shot { border-radius: 12px; border: 1px solid var(--border); overflow: hidden; background: var(--surface); }
+.shot img { width: 100%; aspect-ratio: 4 / 1; object-fit: cover; }
+.tpl-note { color: var(--text-3); font-size: 15px; margin-top: 14px; min-height: 24px; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; margin-top: 56px; }
+pre { margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; overflow-x: auto; font: 14px/1.6 var(--mono); color: var(--text-2); }
+pre .k { color: var(--info); } pre .s { color: var(--ok); } pre .c { color: var(--text-3); }
+
+/* grid children may shrink so wide code blocks scroll instead of widening the page */
+.split > *, .steps > *, .status > *, .channels > *, .features > *, .hero .wrap > * { min-width: 0; }
+
+/* companion */
+.companion img { border-radius: 14px; border: 1px solid var(--border); box-shadow: 0 30px 90px -30px #000; }
+.keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
+.key { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.key kbd { font: 15px var(--mono); color: var(--text); display: inline-flex; gap: 4px; }
+.key kbd span { min-width: 30px; height: 30px; padding: 0 7px; display: inline-grid; place-items: center; border-radius: 7px; border: 1px solid var(--border); border-bottom-width: 3px; background: var(--raised); }
+.key small { color: var(--text-2); font-size: 14px; }
+
+/* start */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; counter-reset: s; }
+.step { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.step .num { font: 13px var(--mono); color: var(--lime); letter-spacing: .14em; }
+.step p { margin: 0; color: var(--text-2); }
+.step pre { padding: 14px 16px; font-size: 13px; }
+.req { margin-top: 22px; color: var(--text-3); font-size: 15px; }
+
+/* status */
+.status { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 36px; }
+.status ul { margin: 14px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.status li { display: flex; gap: 12px; color: var(--text-2); }
+.status li::before { content: ""; flex: none; width: 9px; height: 9px; border-radius: 50%; margin-top: 8px; background: var(--ok); }
+.status .next li::before { background: var(--text-3); }
+.status .box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 26px; }
+
+footer { border-top: 1px solid var(--border); padding: 40px 0 60px; color: var(--text-3); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+footer img { height: 24px; }
+footer .right { margin-left: auto; display: flex; gap: 22px; }
+footer a { color: var(--text-2); text-decoration: none; }
+
+@media (max-width: 900px) {
+  .hero .wrap, .split, .status { grid-template-columns: 1fr; }
+  .dial { max-width: 280px; order: -1; }
+  .channels, .features, .steps { grid-template-columns: 1fr; }
+  .keys { grid-template-columns: repeat(2, 1fr); }
+  nav .links a:not(.gh) { display: none; }
+  section { padding: 64px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+}
+</style>
+</head>
+<body>
+<nav aria-label="Primary">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Pitwall home"><img src="brand/dial-lockup-light.svg" alt="pitwall"></a>
+    <div class="links">
+      <a href="#attention">Attention</a>
+      <a href="#templates">Templates</a>
+      <a href="#start">Get started</a>
+      <a class="gh" href="https://github.com/goriparthi/pitwall">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+  <header class="hero">
+    <div class="wrap">
+      <div>
+        <div class="eyebrow">A personal command center</div>
+        <h1>Your setup.<br><span>In view.</span></h1>
+        <p class="lead">Pitwall turns a dedicated display into a glanceable view of your Claude Code agents, your machine and your shortcuts. When an agent needs you, you see it before you go looking.</p>
+        <div class="cta">
+          <a class="btn primary" href="#start">Get started</a>
+          <a class="btn" href="https://github.com/goriparthi/pitwall">View on GitHub ↗</a>
+        </div>
+        <div class="meta"><span><b>macOS</b> · Windows early</span><span><b>Local only</b></span><span><b>MIT</b> licensed</span></div>
+      </div>
+      <svg class="dial" viewBox="-20 -20 240 240" role="img" aria-label="The Pitwall dial">
+        <g id="ticks"></g>
+        <path fill="#F3F5EF" d="M161.20 39.58A86 86 0 0 1 61.45 176.88L90.56 136.81A38 38 0 0 0 132.09 79.65ZM138.55 23.12A86 86 0 0 0 38.80 160.42L67.91 120.35A38 38 0 0 1 109.44 63.19Z"/>
+        <path class="needle" fill="#F26B2A" d="M152.90 27.19L116.10 106.76L88.60 86.77Z"/>
+      </svg>
+    </div>
+    <figure class="device">
+      <div class="bezel"><img src="img/panel-balanced.jpg" width="3840" height="960" alt="Pitwall on a 1920 by 480 display: an agent waiting for approval highlighted in amber, a working agent, computer health tiles and a launcher"></div>
+      <figcaption class="caption">A real build at the Lian Li 8.8″ Universal Screen's native 1920 × 480, running Pitwall's labelled demo data.</figcaption>
+    </figure>
+  </header>
+
+  <section id="attention">
+    <div class="wrap">
+      <div class="eyebrow">Attention, done right</div>
+      <h2>When an agent needs you,<br>you'll know.</h2>
+      <p class="lead">Claude Code hooks tell Pitwall the moment a session asks for approval, asks a question or fails. That turns into three signals you can't miss and won't confuse.</p>
+      <div class="channels">
+        <article class="chan">
+          <div class="art"><div class="pill"><span>▲</span><b>api-gateway-3</b><span>needs approval · Bash</span></div></div>
+          <h3>On the panel</h3>
+          <p>The header becomes an amber alert with who is waiting, for what and for how long, and the screen edge glows.</p>
+        </article>
+        <article class="chan">
+          <div class="art"><div class="ring" aria-hidden="true"></div><span class="illus">Illustration</span></div>
+          <h3>On the LED ring</h3>
+          <p>The Universal Screen's ring breathes amber while an agent waits, glows red on a failure and stays dark when all is calm.</p>
+        </article>
+        <article class="chan">
+          <div class="art"><div class="menubar"><span class="dim">Wi-Fi</span><span class="me"><img src="brand/menu-glyph.svg" alt="">▲ 1</span><span class="dim">Fri 9:41</span></div><span class="illus">Illustration</span></div>
+          <h3>In your menu bar</h3>
+          <p>A small Dial with a count, on macOS and in the Windows tray. Global hotkeys switch layouts without leaving your editor.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="eyebrow">What's on the wall</div>
+      <h2>Everything you check,<br>in one glance.</h2>
+      <div class="features">
+        <article class="feat"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"/></svg></div><h3>Agents at a glance</h3><p>Every Claude Code session as working, waiting, done, failed or idle, with its task title, latest tool and elapsed time.</p></article>
+        <article class="feat"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12h5l3-8 4 16 3-8h5"/></svg></div><h3>Measured usage</h3><p>Context size and token totals come from Claude Code's own transcripts. Cost is not guessed or shown.</p></article>
+        <article class="feat"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v13H3z M8 21h8 M12 17v4"/></svg></div><h3>Machine health</h3><p>CPU, memory, network and disk with short trends, plus GPU, battery and the busiest processes.</p></article>
+        <article class="feat"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7l5 5-5 5 M12 17h8"/></svg></div><h3>A safe launcher</h3><p>Open a terminal, editor or new Claude session in the current project. Only actions you list in config can run.</p></article>
+        <article class="feat"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h16v18H4z M4 9h16 M10 9v12"/></svg></div><h3>Templates</h3><p>Six layouts out of the box. Override any of them or add your own in <code>config.json</code>; changes apply within two seconds.</p></article>
+        <article class="feat"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9c-4-1.5-7-4.5-7-9V6z M9 12l2 2 4-4"/></svg></div><h3>Private by default</h3><p>Runs on 127.0.0.1 only. Hooks forward event names, never prompts, commands or output. Privacy mode hides names.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section id="templates">
+    <div class="wrap">
+      <div class="eyebrow">Built from templates</div>
+      <h2>One wall. Many ways to work.</h2>
+      <p class="lead">Switch layouts with a number key or let them rotate. Every one is a grid of widgets you can rearrange.</p>
+      <div class="tabs" role="tablist" aria-label="Templates">
+        <button role="tab" aria-selected="true" aria-controls="tpl" data-img="panel-balanced" data-note="Agents, computer health and the launcher side by side. The default."><span class="n">01</span>Balanced</button>
+        <button role="tab" aria-selected="false" aria-controls="tpl" data-img="panel-agents" data-note="Room for four agent cards when you run several sessions at once."><span class="n">02</span>Agents</button>
+        <button role="tab" aria-selected="false" aria-controls="tpl" data-img="panel-usage" data-note="Today's measured tokens and turns, with a row per live session."><span class="n">03</span>AI usage</button>
+        <button role="tab" aria-selected="false" aria-controls="tpl" data-img="panel-system" data-note="Per-core CPU, memory breakdown and the busiest processes."><span class="n">04</span>System</button>
+        <button role="tab" aria-selected="false" aria-controls="tpl" data-img="panel-monitor" data-note="Health and system detail together, no launcher. Available from the palette or the More layouts menu."><span class="n">+</span>Monitor</button>
+      </div>
+      <div class="shot" id="tpl" role="tabpanel"><img id="tpl-img" src="img/panel-balanced.jpg" width="3840" height="960" alt="Balanced template"></div>
+      <p class="tpl-note" id="tpl-note">Agents, computer health and the launcher side by side. The default.</p>
+
+      <div class="split">
+        <div>
+          <div class="eyebrow">Make it yours</div>
+          <h2 style="font-size:clamp(28px,3.4vw,38px)">A template is a few lines of JSON.</h2>
+          <p class="lead" style="font-size:18px">Pick columns and widgets, give it a number key, and the panel picks it up within two seconds. Built-ins stay available, so getting back to defaults is one delete away.</p>
+        </div>
+<pre><span class="c">// config.json</span>
+<span class="k">"ui"</span>: { <span class="k">"layouts"</span>: [<span class="s">"balanced"</span>, <span class="s">"wide"</span>, <span class="s">"usage"</span>] },
+<span class="k">"layouts"</span>: [{
+  <span class="k">"id"</span>: <span class="s">"wide"</span>, <span class="k">"name"</span>: <span class="s">"Wide agents"</span>,
+  <span class="k">"columns"</span>: [<span class="s">"1300px"</span>, <span class="s">"1fr"</span>],
+  <span class="k">"slots"</span>: [<span class="s">"ai"</span>, <span class="s">"launcher"</span>]
+}]</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="companion">
+    <div class="wrap">
+      <div class="eyebrow">On your main monitor</div>
+      <h2>The display shows.<br>Your keyboard drives.</h2>
+      <p class="lead">The panel has no touch, so nothing on it pretends to be a button. Drive it from anywhere with global hotkeys, the menu bar, or the full dashboard and its ⌘K command palette.</p>
+      <img src="img/dashboard-palette.jpg" width="2880" height="860" alt="The full Pitwall dashboard in a browser with the command palette open, listing layouts" loading="lazy" style="margin-top:40px">
+      <div class="keys">
+        <div class="key"><kbd><span>⌃</span><span>⌥</span><span>F</span></kbd><small>Focus on active agents</small></div>
+        <div class="key"><kbd><span>⌃</span><span>⌥</span><span>1–9</span></kbd><small>Switch layout</small></div>
+        <div class="key"><kbd><span>⌃</span><span>⌥</span><span>H</span></kbd><small>Privacy mode</small></div>
+        <div class="key"><kbd><span>⌃</span><span>⌥</span><span>K</span></kbd><small>Command palette</small></div>
+      </div>
+      <p class="req">On Windows the same keys use Ctrl+Alt.</p>
+    </div>
+  </section>
+
+  <section id="start">
+    <div class="wrap">
+      <div class="eyebrow">Get started</div>
+      <h2>Up in three commands.</h2>
+      <div class="steps">
+        <div class="step"><span class="num">01 / BUILD</span><p>Clone and build one binary. macOS links libusb statically; Windows needs no cgo.</p><pre>git clone https://github.com/goriparthi/pitwall
+cd pitwall && scripts/build.sh</pre></div>
+        <div class="step"><span class="num">02 / CONNECT</span><p>Add the Claude Code hooks. Your settings file is backed up first, and uninstall is one command.</p><pre>bin/pitwall hooks install</pre></div>
+        <div class="step"><span class="num">03 / RUN</span><p>Start it in the background. No screen yet? Try the labelled demo in your browser.</p><pre>bin/pitwall start
+bin/pitwall run --demo --no-display</pre></div>
+      </div>
+      <p class="req">Needs Go 1.26+ to build, Chrome, Edge or Brave for rendering, and Homebrew libusb on macOS at build time.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="eyebrow">Honest status</div>
+      <h2>What works today.</h2>
+      <div class="status">
+        <div class="box"><h3>Working</h3><ul>
+          <li>Lian Li 8.8″ Universal Screen over USB on macOS, plus its LED ring</li>
+          <li>Claude Code sessions through hooks and Claude Code's own session files</li>
+          <li>Menu bar, global hotkeys, templates, demo mode</li>
+          <li>Windows builds cleanly and passes static checks</li>
+        </ul></div>
+        <div class="box next"><h3>Next</h3><ul>
+          <li>Verify Windows on real hardware (WinUSB driver, quit L-Connect first)</li>
+          <li>Exact session cost from the Claude Code status line</li>
+          <li>Codex session telemetry and Windows GPU metrics</li>
+          <li>Signed releases and start at login</li>
+        </ul></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <img src="brand/dial-lockup-light.svg" alt="pitwall">
+    <span>Your setup. In view. · MIT licensed</span>
+    <span class="right"><a href="https://github.com/goriparthi/pitwall">GitHub</a><a href="https://github.com/goriparthi/pitwall/blob/main/README.md">Docs</a></span>
+    <span style="flex-basis:100%;font-size:13px">Not affiliated with or endorsed by Lian Li. Claude and Claude Code are trademarks of Anthropic. Screenshots show Pitwall's demo data.</span>
+  </div>
+</footer>
+
+<script>
+  // gauge ticks around the hero dial
+  (function () {
+    const g = document.getElementById('ticks');
+    for (let i = 0; i < 25; i++) {
+      const a = (-135 + i * 11.25) * Math.PI / 180;
+      const r1 = 104, r2 = i % 4 === 0 ? 116 : 111;
+      const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      l.setAttribute('x1', 100 + r1 * Math.sin(a)); l.setAttribute('y1', 100 - r1 * Math.cos(a));
+      l.setAttribute('x2', 100 + r2 * Math.sin(a)); l.setAttribute('y2', 100 - r2 * Math.cos(a));
+      l.setAttribute('class', 'tick' + (i > 18 ? ' hot' : ''));
+      g.appendChild(l);
+    }
+  })();
+  // template tabs
+  (function () {
+    const tabs = [...document.querySelectorAll('[role=tab]')];
+    const img = document.getElementById('tpl-img'), note = document.getElementById('tpl-note');
+    const pick = (t) => {
+      tabs.forEach((x) => x.setAttribute('aria-selected', String(x === t)));
+      img.src = 'img/' + t.dataset.img + '.jpg';
+      img.alt = t.textContent.replace(/^\d+/, '') + ' template';
+      note.textContent = t.dataset.note;
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => pick(t));
+      t.addEventListener('keydown', (e) => {
+        const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (d) { const n = tabs[(i + d + tabs.length) % tabs.length]; n.focus(); pick(n); }
+      });
+    });
+  })();
+</script>
+</body>
+</html>
