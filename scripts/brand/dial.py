@@ -10,6 +10,9 @@ ORANGE = "#F26B2A"   # logo needle only; the UI accent stays Pit Lime
 INK = "#1F2226"      # ring on light backgrounds
 PAPER = "#F3F5EF"    # ring on dark backgrounds
 TILE = "#10171C"     # app icon tile (brand accentText token)
+# menu bar status dial: >= 3:1 against both the light and the dark macOS menu bar
+MENU_OK = "#2DA44E"
+MENU_DOWN = "#E5484D"
 
 C, R, r, CUT, PHI = 100.0, 86.0, 38.0, 14.0, math.radians(36)
 u = (math.sin(PHI), -math.cos(PHI))   # needle direction (up and right), SVG y grows down
@@ -24,7 +27,7 @@ def f(x):
     return f"{x:.2f}"
 
 
-def half(side):
+def half(side, R=R, r=r, CUT=CUT):
     """One ring half: the cut runs along the needle axis, offset by CUT on each side."""
     d = side * CUT
     to, ti = math.sqrt(R * R - d * d), math.sqrt(r * r - d * d)
@@ -35,8 +38,7 @@ def half(side):
             f"L{f(c[0])} {f(c[1])}A{r:g} {r:g} 0 0 {s_in} {f(e[0])} {f(e[1])}Z")
 
 
-def needle():
-    tip_t, base_t, hw = R + 4, 4.0, 17.0
+def needle(tip_t=R + 4, base_t=4.0, hw=17.0):
     tip = pt(0, tip_t)
     b1, b2 = pt(hw, base_t), pt(-hw, base_t)
     return f"M{f(tip[0])} {f(tip[1])}L{f(b1[0])} {f(b1[1])}L{f(b2[0])} {f(b2[1])}Z"
@@ -44,12 +46,17 @@ def needle():
 
 RING = half(1) + half(-1)
 NEEDLE = needle()
+# At 16 pt the logo's needle blurs into the ring, so the menu bar variant thins the ring, widens the split
+# and lets the needle run past the rim.
+MENU_R, MENU_r, MENU_CUT = 82.0, 44.0, 20.0
+MENU_RING = half(1, MENU_R, MENU_r, MENU_CUT) + half(-1, MENU_R, MENU_r, MENU_CUT)
+MENU_NEEDLE = needle(tip_t=MENU_R + 34, base_t=-14.0, hw=20.0)
 
 
-def symbol(ring, needle_color, size=200, pad=0):
+def symbol(ring, needle_color, size=200, pad=0, needle_path=NEEDLE, ring_path=RING):
     vb = f"{-pad:g} {-pad:g} {200 + 2 * pad:g} {200 + 2 * pad:g}"
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="{vb}">'
-            f'<path d="{RING}" fill="{ring}"/><path d="{NEEDLE}" fill="{needle_color}"/></svg>\n')
+            f'<path d="{ring_path}" fill="{ring}"/><path d="{needle_path}" fill="{needle_color}"/></svg>\n')
 
 
 def app_icon(size=1024):
@@ -76,7 +83,9 @@ def lockup(ring, word):
 files = {
     "dial-symbol-light.svg": symbol(PAPER, ORANGE),   # for dark backgrounds
     "dial-symbol-dark.svg": symbol(INK, ORANGE),      # for light backgrounds
-    "dial-menu-template.svg": symbol("#000000", "#000000", size=22, pad=6),
+    "dial-menu-template.svg": symbol("#000000", "#000000", size=22, pad=10, needle_path=MENU_NEEDLE, ring_path=MENU_RING),
+    "dial-menu-connected.svg": symbol(MENU_OK, MENU_OK, size=22, pad=10, needle_path=MENU_NEEDLE, ring_path=MENU_RING),
+    "dial-menu-disconnected.svg": symbol(MENU_DOWN, MENU_DOWN, size=22, pad=10, needle_path=MENU_NEEDLE, ring_path=MENU_RING),
     "dial-app-icon.svg": app_icon(),
     "dial-lockup-light.svg": lockup(PAPER, PAPER),
     "dial-lockup-dark.svg": lockup(INK, INK),

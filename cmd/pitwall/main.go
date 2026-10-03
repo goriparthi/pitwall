@@ -138,6 +138,19 @@ func startCmd(args []string) int {
 	return 1
 }
 
+// relaunch starts a fresh detached `pitwall run` with the given flags, logging like `pitwall start`.
+func relaunch(args []string) error {
+	logf, err := os.OpenFile(filepath.Join(config.StateDir(), "stdout.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer logf.Close()
+	c := exec.Command(exe(), append([]string{"run"}, args...)...)
+	c.Stdout, c.Stderr = logf, logf
+	detach(c)
+	return c.Start()
+}
+
 func stopCmd() int {
 	tok, err := os.ReadFile(config.TokenFile())
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/goriparthi/pitwall/internal/collect/claude"
@@ -101,6 +102,12 @@ func runCmd(args []string) int {
 		})
 	}
 	srv.Shutdown = shutdown
+	var restart atomic.Bool
+	restartFn := func() {
+		log.Info("restart requested")
+		restart.Store(true)
+		shutdown()
+	}
 
 	if f.noTray {
 		<-ctx.Done()
@@ -109,7 +116,7 @@ func runCmd(args []string) int {
 			<-ctx.Done()
 			tray.Stop()
 		}()
-		tray.Run(tray.Options{Srv: srv, Cfg: store, Log: log, OpenBrowser: openBrowser, Base: base, Quit: shutdown})
+		tray.Run(tray.Options{Srv: srv, Cfg: store, Log: log, OpenBrowser: openBrowser, Base: base, Quit: shutdown, Restart: restartFn})
 		shutdown()
 	}
 	close(stopWatch)
@@ -122,5 +129,12 @@ func runCmd(args []string) int {
 		log.Warn("display shutdown timed out")
 	}
 	srv.Stop()
+	if restart.Load() {
+		// the port, screen and LED ring are released by now, so the new process can claim them
+		if err := relaunch(args); err != nil {
+			log.Error("restart failed; start Pitwall again by hand", map[string]any{"message": err.Error()})
+			return 1
+		}
+	}
 	return 0
 }
