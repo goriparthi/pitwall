@@ -40,8 +40,8 @@ func Run(o Options) {
 
 func Stop() { systray.Quit() }
 
-// setIcon: on macOS the dial shows the screen (green streaming, red otherwise) and the title carries agent
-// status; Windows has no title, so its brand icon keeps the agent status dot.
+// setIcon: on macOS the dial shows the screen (green streaming, red otherwise); Windows keeps the brand icon
+// with the agent status dot.
 var (
 	iconMu   sync.Mutex
 	lastIcon []byte
@@ -384,19 +384,16 @@ func buildMenu(ctx context.Context, o Options) {
 			screenRow.Hide()
 		}
 
+		// the menu bar shows only the dial; agent counts live in the menu rows (other apps notify about agents)
 		switch {
 		case count["waiting"] > 0:
 			setIcon(screenUp, icoWaiting)
-			systray.SetTitle(fmt.Sprintf("▲ %d", count["waiting"]))
 		case count["failed"] > 0:
 			setIcon(screenUp, icoFailed)
-			systray.SetTitle(fmt.Sprintf("✕ %d", count["failed"]))
 		case count["working"] > 0:
 			setIcon(screenUp, icoWorking)
-			systray.SetTitle(fmt.Sprintf("%d", count["working"]))
 		default:
 			setIcon(screenUp, icoCalm)
-			systray.SetTitle("")
 		}
 		screen := "screen not connected"
 		if screenUp {
