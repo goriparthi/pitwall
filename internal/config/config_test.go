@@ -52,3 +52,22 @@ func TestLayoutsOverrideAndOrder(t *testing.T) {
 		t.Fatalf("order %v", got)
 	}
 }
+
+func TestForIntegrationsHidesWhatIsAbsent(t *testing.T) {
+	all := (&Config{}).AllLayouts()
+	without := ForIntegrations(all, map[string]bool{})
+	ids := map[string]Layout{}
+	for _, l := range without {
+		ids[l.ID] = l
+	}
+	if _, ok := ids["ai-desk"]; ok {
+		t.Fatal("ai-desk requires redline and must be hidden without it")
+	}
+	if u := ids["usage"]; strings.Join(u.Slots, ",") != "usage" || strings.Join(u.Columns, ",") != "1fr" {
+		t.Fatalf("limits slot and its column should be dropped: %+v", u)
+	}
+	with := ForIntegrations(all, map[string]bool{"redline": true})
+	if len(with) != len(all) {
+		t.Fatal("everything is usable when redline is present")
+	}
+}

@@ -66,7 +66,7 @@ func onReady(o Options) {
 	for i := 0; i < 9; i++ {
 		idx := i
 		bind[Key('1'+i)] = func() {
-			order := o.Cfg.Get().PageOrder()
+			order := o.Srv.PageOrder()
 			if idx < len(order) {
 				o.Srv.PatchUI(map[string]any{"page": order[idx], "focus": false})
 			}
@@ -132,10 +132,10 @@ func buildMenu(ctx context.Context, o Options) {
 	layoutsMenu := systray.AddMenuItem("Layout", "Dashboard template")
 	layoutItems := map[string]*systray.MenuItem{}
 	numbered := map[string]int{}
-	for i, id := range cfg.PageOrder() {
+	for i, id := range o.Srv.PageOrder() {
 		numbered[id] = i + 1
 	}
-	for _, l := range cfg.AllLayouts() {
+	for _, l := range o.Srv.Layouts() {
 		title := l.Name
 		if n := numbered[l.ID]; n > 0 {
 			title = fmt.Sprintf("%s   %s%d", l.Name, HotkeyLabel, n)

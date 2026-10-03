@@ -26,6 +26,7 @@ import (
 
 	"github.com/goriparthi/pitwall/internal/collect/claude"
 	"github.com/goriparthi/pitwall/internal/collect/demo"
+	"github.com/goriparthi/pitwall/internal/collect/redline"
 	"github.com/goriparthi/pitwall/internal/collect/system"
 	"github.com/goriparthi/pitwall/internal/collect/tools"
 	"github.com/goriparthi/pitwall/internal/config"
@@ -54,6 +55,7 @@ type Server struct {
 	System   *system.Collector
 	Claude   *claude.Collector
 	Tools    *tools.Collector
+	Redline  *redline.Collector // nil when the integration is off
 	DemoSrc  *demo.Source
 	Launcher *launcher.Launcher
 	Shutdown func()
@@ -95,20 +97,54 @@ func (s *Server) Init() error {
 	}
 	s.token = t
 	c := s.Cfg.Get()
-	s.ui = UIState{Page: c.PageOrder()[0], Project: "all", Rotate: c.UI.RotatePages, Brightness: c.Display.Brightness}
+	s.ui = UIState{Page: s.PageOrder()[0], Project: "all", Rotate: c.UI.RotatePages, Brightness: c.Display.Brightness}
 	if b, err := os.ReadFile(s.uiFile()); err == nil {
 		_ = json.Unmarshal(b, &s.ui)
 	}
 	if !s.layoutExists(s.ui.Page) {
-		s.ui.Page = c.PageOrder()[0]
+		s.ui.Page = s.PageOrder()[0]
 	}
 	s.display = M{"state": "unknown"}
 	s.clients = map[chan []byte]bool{}
 	return nil
 }
 
+// Integrations reports which optional data sources are present right now (demo mode shows them all).
+func (s *Server) Integrations() map[string]bool {
+	have := map[string]bool{}
+	if s.Demo {
+		have["redline"] = true
+	} else if s.Redline != nil {
+		have["redline"] = s.Redline.Snapshot().Installed
+	}
+	return have
+}
+
+// Layouts are the templates usable on this machine: those needing an absent integration are hidden.
+func (s *Server) Layouts() []config.Layout {
+	return config.ForIntegrations(s.Cfg.Get().AllLayouts(), s.Integrations())
+}
+
+// PageOrder is the configured number-key order, limited to usable layouts.
+func (s *Server) PageOrder() []string {
+	usable := map[string]bool{}
+	for _, l := range s.Layouts() {
+		usable[l.ID] = true
+	}
+	var out []string
+	for _, id := range s.Cfg.Get().PageOrder() {
+		if usable[id] {
+			out = append(out, id)
+		}
+	}
+	if len(out) == 0 {
+		out = []string{"balanced"}
+	}
+	return out
+}
+
 func (s *Server) layoutExists(id string) bool {
-	for _, l := range s.Cfg.Get().AllLayouts() {
+	for _, l := range s.Layouts() {
 		if l.ID == id {
 			return true
 		}
@@ -195,13 +231,19 @@ func (s *Server) Snapshot() M {
 	out := M{
 		"mode": "live", "now": time.Now().UnixMilli(), "ui": ui, "display": display,
 		"projects": projects, "actions": s.Launcher.List(),
-		"layouts": c.AllLayouts(), "pageOrder": c.PageOrder(),
+		"layouts": s.Layouts(), "pageOrder": s.PageOrder(), "integrations": s.Integrations(),
 	}
 	if s.Demo {
 		sys, cl, tl := s.DemoSrc.Snapshot()
 		out["mode"], out["system"], out["claude"], out["tools"] = "demo", sys, cl, tl
+		out["limits"] = s.DemoSrc.Limits()
 	} else {
 		out["system"], out["claude"], out["tools"] = s.System.Snapshot(), s.Claude.Snapshot(), s.Tools.Snapshot()
+		if s.Redline != nil {
+			if l := s.Redline.Snapshot(); l.Installed {
+				out["limits"] = l
+			}
+		}
 	}
 	return out
 }
@@ -264,7 +306,7 @@ func (s *Server) rotator(ctx context.Context) {
 		}
 		seen = urgent
 		u := s.UI()
-		order := s.Cfg.Get().PageOrder()
+		order := s.PageOrder()
 		// A newly urgent item jumps to the first page once; rotation pauses while anything is urgent.
 		if fresh && u.Page != order[0] {
 			u.Page, last = order[0], time.Now()

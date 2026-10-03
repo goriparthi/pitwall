@@ -125,6 +125,26 @@ func (s *Source) story(n int64) M {
 	}
 }
 
+// Limits mirrors the RedLine integration's shape: session and week windows with measured pace.
+func (s *Source) Limits() M {
+	n := time.Now()
+	elapsed := float64(n.Sub(s.t0).Milliseconds()%storyMs) / 1000
+	session := 62 + elapsed*0.25 // creeps up during the story
+	resetSession := n.Add(78 * time.Minute).UnixMilli()
+	resetWeek := time.Date(n.Year(), n.Month(), n.Day(), 7, 0, 0, 0, time.UTC).AddDate(0, 0, 3).UnixMilli()
+	return M{
+		"installed": true, "available": true, "source": "redline status", "asOf": n.Add(-40 * time.Second).UnixMilli(), "checkedAt": n.UnixMilli(),
+		"windows": []M{
+			{"key": "five_hour", "name": "Session", "provider": "Claude", "used": session, "resetsAt": resetSession, "lengthMs": int64(5 * time.Hour / time.Millisecond), "provenance": "official",
+				"pace": M{"ratePerHour": 18.4, "exhaustsAt": n.Add(2*time.Hour + 4*time.Minute).UnixMilli(), "hitsBeforeReset": false, "basis": "measured from 14 readings over 52m"}},
+			{"key": "seven_day", "name": "Week", "provider": "Claude", "used": 41.0, "resetsAt": resetWeek, "lengthMs": int64(7 * 24 * time.Hour / time.Millisecond), "provenance": "official",
+				"pace": M{"ratePerHour": 0.71, "exhaustsAt": n.Add(83 * time.Hour).UnixMilli(), "hitsBeforeReset": false, "basis": "measured from 52 readings over 13h 10m"}},
+		},
+		"today": M{"tokens": 412000.0, "costUsd": 61.4, "costBasis": "local_estimate", "tokensBasis": "official"},
+		"week":  M{"tokens": 2.31e6, "costUsd": 318.9, "costBasis": "local_estimate", "tokensBasis": "official"},
+	}
+}
+
 // Snapshot returns system, claude and tools sections in the live shapes.
 func (s *Source) Snapshot() (system, claude, tools M) {
 	s.mu.Lock()

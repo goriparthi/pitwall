@@ -8,6 +8,7 @@ import (
 
 	"github.com/goriparthi/pitwall/internal/collect/claude"
 	"github.com/goriparthi/pitwall/internal/collect/demo"
+	"github.com/goriparthi/pitwall/internal/collect/redline"
 	"github.com/goriparthi/pitwall/internal/collect/system"
 	"github.com/goriparthi/pitwall/internal/collect/tools"
 	"github.com/goriparthi/pitwall/internal/config"
@@ -43,6 +44,10 @@ func runCmd(args []string) int {
 		srv.System = system.New(log)
 		srv.Claude = claude.New(log, func() int { return store.Get().UI.CompletedHoldMinutes })
 		srv.Tools = &tools.Collector{}
+		if store.Get().Integrations.Redline != "off" {
+			srv.Redline = &redline.Collector{}
+			srv.Redline.Start(ctx)
+		}
 		srv.System.Start(ctx)
 		srv.Claude.Start(ctx)
 		srv.Tools.Start(ctx)

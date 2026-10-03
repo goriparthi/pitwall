@@ -68,11 +68,17 @@ type Action struct {
 
 // Layout is a dashboard template: grid columns and the widget in each slot.
 type Layout struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Columns []string `json:"columns"`
-	Slots   []string `json:"slots"`
-	Focus   bool     `json:"focus,omitempty"`
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Columns  []string `json:"columns"`
+	Slots    []string `json:"slots"`
+	Focus    bool     `json:"focus,omitempty"`
+	Requires string   `json:"requires,omitempty"` // an integration; the layout is hidden when it is absent
+}
+
+// Integrations are optional data sources. "auto" turns one on only when it is found on this machine.
+type Integrations struct {
+	Redline string `json:"redline"` // auto | off
 }
 
 type Config struct {
@@ -82,13 +88,16 @@ type Config struct {
 	UI       UI        `json:"ui"`
 	Projects []Project `json:"projects"`
 	Actions  []Action  `json:"actions"`
-	Layouts  []Layout  `json:"layouts"`
+	Layouts      []Layout     `json:"layouts"`
+	Integrations Integrations `json:"integrations"`
 }
 
 var (
 	ActionKinds  = map[string]bool{"terminal": true, "open-app": true, "open-url": true}
 	ReservedKeys = map[string]bool{"f": true, "h": true, "r": true, "k": true}
-	Widgets      = map[string]bool{"ai": true, "health": true, "health-mini": true, "launcher": true, "usage": true, "system": true}
+	Widgets      = map[string]bool{"ai": true, "health": true, "health-mini": true, "launcher": true, "usage": true, "system": true, "limits": true}
+	// WidgetRequires names the integration a widget needs; its slot is dropped when that is absent.
+	WidgetRequires = map[string]string{"limits": "redline"}
 	keyRe        = regexp.MustCompile(`^[a-z]$`)
 	idRe         = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)
 	columnRe     = regexp.MustCompile(`^(\d{2,4}px|\d(\.\d+)?fr)$`)
@@ -233,6 +242,9 @@ func Parse(data []byte) (*Config, error) {
 				errs = append(errs, fmt.Sprintf("layout %s: unknown widget %q", l.ID, w))
 			}
 		}
+		if l.Requires != "" && l.Requires != "redline" {
+			errs = append(errs, fmt.Sprintf("layout %s: requires must be \"redline\" or empty", l.ID))
+		}
 	}
 	if len(errs) > 0 {
 		return nil, errors.New(strings.Join(errs, "\n  "))
@@ -256,6 +268,9 @@ func applyDefaults(c *Config) {
 	c.LED.MaxBrightness = clamp(c.LED.MaxBrightness, 0, 100, 60)
 	c.UI.RotateSeconds = clamp(c.UI.RotateSeconds, 5, 600, 20)
 	c.UI.CompletedHoldMinutes = clamp(c.UI.CompletedHoldMinutes, 1, 240, 10)
+	if c.Integrations.Redline != "off" {
+		c.Integrations.Redline = "auto"
+	}
 }
 
 func clamp(v, lo, hi, def int) int {

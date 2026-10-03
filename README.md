@@ -12,7 +12,7 @@
   <a href="#compatibility">Compatibility</a>
 </p>
 
-Pitwall is a dashboard for the screen beside your monitor. It shows CPU, memory, network and disk, the Claude Code sessions you have running, and shortcuts to the tools you open most. You pick a template and it fills in with live data from your computer. It drives the Lian Li 8.8" Universal Screen over USB, or runs in a browser window if you don't have one.
+Pitwall is a dashboard for the screen beside your monitor. It shows CPU, memory, network and disk, the Claude Code sessions you have running, how much of your Claude plan is left this week, and shortcuts to the tools you open most. You pick a template and it fills in with live data from your computer. It drives the Lian Li 8.8" Universal Screen over USB, or runs in a browser window if you don't have one.
 
 **Status:** early development. Works on macOS today; Windows builds are in testing. There's no installer yet. MIT licensed.
 
@@ -24,7 +24,7 @@ Pitwall is a dashboard for the screen beside your monitor. It shows CPU, memory,
 
 Balanced is the template Pitwall starts with. From left to right:
 
-1. **Header.** The layout and project you're looking at. When an agent needs you, it turns into an amber alert saying who is waiting, for what, and for how long.
+1. **Header.** The layout and project you're looking at, and your plan's session and week usage if RedLine is installed. When an agent needs you, it turns into an amber alert saying who is waiting, for what, and for how long.
 2. **Agents.** One card per Claude Code session: status, time in that status, task title, latest tool, context size and output tokens.
 3. **Computer.** CPU with a 90 second trend, memory, network down and up, and free disk. GPU and battery sit in the label row.
 4. **Launcher.** Your shortcuts and their keys. The screen has no touch, so you run them from the menu bar or the desktop dashboard.
@@ -50,17 +50,23 @@ With the Claude Code hooks installed, Pitwall hears about each session as it wor
 - the display's LED ring breathes amber
 - the menu bar shows `▲ 1`
 
-![The Agents template, with one session waiting for approval](site/img/panel-agents.jpg)
+![The AI desk template: agents, plan limit gauges and the launcher](site/img/panel-ai-desk.jpg)
 
-The AI usage template adds today's measured token totals and a row per running session. Ollama shows which models are loaded. Codex, Cursor and Claude Desktop are only detected as running, with no task detail. Not yet: cost, and task detail for agents other than Claude Code.
+If you use [RedLine](https://github.com/goriparthi/redline), the AI desk template adds your Claude plan limits. For the 5 hour session and the week it shows how much is left, when each resets, how fast you're using it, and whether that pace lasts until the reset. The white tick on each gauge marks how much of the window has passed. It also shows today's tokens and RedLine's estimated cost. The AI usage template shows the same gauges next to today's token totals and a row per running session.
+
+Ollama shows which models are loaded. Codex, Cursor and Claude Desktop are only detected as running, with no task detail. Not yet: task detail for agents other than Claude Code.
+
+### RedLine is optional
+
+Pitwall turns the RedLine integration on only when it finds RedLine on the machine: its `redline` command, or the files RedLine publishes for other tools (`~/.local/share/redline/usage-snapshot.json`, or the statusline feed `claude-usage.json`). It runs `redline status --json` once a minute, which reads what RedLine already saved and makes no network request. When RedLine isn't there, Pitwall hides the AI desk template, drops the limits widget from other templates, and shows no limits in the header. Set `"integrations": { "redline": "off" }` to turn it off even when RedLine is installed.
 
 ## How a dashboard fits together
 
 | Term | What it is |
 | --- | --- |
-| Template | A named grid of up to four widgets. Six ship with Pitwall: `balanced`, `agents`, `focus`, `usage`, `system`, `monitor`. |
-| Widget | One block of the screen: `ai`, `health`, `health-mini`, `launcher`, `usage`, `system`. |
-| Data source | Where the numbers come from. Today these are built in: your computer's own counters, Claude Code's session files and hooks, and Ollama's local API. Sources you add yourself are planned. |
+| Template | A named grid of up to four widgets. Seven ship with Pitwall: `balanced`, `ai-desk`, `agents`, `focus`, `usage`, `system`, `monitor`. A template can declare `"requires": "redline"` to appear only when RedLine is installed. |
+| Widget | One block of the screen: `ai`, `limits`, `health`, `health-mini`, `launcher`, `usage`, `system`. The `limits` widget needs RedLine; without it, its slot is left out. |
+| Data source | Where the numbers come from. Built in: your computer's own counters, Claude Code's session files and hooks, and Ollama's local API. Optional: RedLine, for plan limits and estimated cost. Sources you add yourself are planned. |
 | Action | A launcher entry: a terminal or app opened in the selected project, or a URL. Only actions listed in the config can run. |
 
 All of it lives in one JSON file; `pitwall config` prints its path. Pitwall rereads the file within two seconds. If an edit is invalid, it keeps the last working version and logs why.
@@ -132,9 +138,10 @@ The menu bar icon (a tray icon on Windows) lists your sessions, launcher actions
 | Data | CPU, memory, disk, network, processes, battery | Works | macOS; the Windows versions are written but untested |
 | Data | GPU and thermal state | macOS only | Temperatures need root and aren't read |
 | Data | Claude Code | Works | Status, approvals, failures, measured tokens |
+| Data | Claude plan limits, estimated cost | With RedLine | Only when [RedLine](https://github.com/goriparthi/redline) is installed (macOS); cost is its local estimate |
 | Data | Ollama | Works | Which models are loaded |
 | Data | Codex, Cursor, Claude Desktop | Detected only | Shown as running; no task detail |
-| Planned | Service checks, cost, installers | Planned | Also Codex session detail and starting at login |
+| Planned | Service checks, installers | Planned | Also Codex session detail and starting at login |
 
 ## Privacy and security
 
@@ -149,6 +156,7 @@ The hook forwarder sends event names, tool names and file basenames, never promp
 | Task title, tokens, context size | Transcript `ai-title` and `usage` fields |
 | Codex, Cursor, Claude Desktop | Process names only |
 | Ollama | Its local API |
+| Plan limits, pace, estimated cost | RedLine's `status --json` or its published files, when installed |
 | System metrics | macOS tools; gopsutil on Windows |
 
 ## How it's built

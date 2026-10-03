@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pitwall: a dashboard for the screen beside your monitor</title>
-<meta name="description" content="Pitwall shows CPU, memory, network and disk, your running Claude Code sessions, and shortcuts on a small dedicated display or in a browser window. Built from templates. Open source, early development.">
+<meta name="description" content="Pitwall shows CPU, memory, network and disk, your running Claude Code sessions, plan limits, and shortcuts on a small dedicated display or in a browser window. Built from templates. Open source, early development.">
 <meta name="theme-color" content="#0B1014">
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="brand/favicon.ico" sizes="any">
@@ -213,7 +213,7 @@ footer .fine { flex-basis: 100%; }
   <header class="hero">
     <div class="wrap">
       <h1>A dashboard for the screen beside your monitor.</h1>
-      <p class="lede">Pitwall shows CPU, memory, network and disk, the Claude Code sessions you have running, and shortcuts to the tools you open most. Pick one of its templates and it fills in with live data from your computer. It drives a small USB display, or runs in a browser window if you don't have one.</p>
+      <p class="lede">Pitwall shows CPU, memory, network and disk, the Claude Code sessions you have running, how much of your Claude plan is left this week, and shortcuts to the tools you open most. Pick one of its templates and it fills in with live data from your computer. It drives a small USB display, or runs in a browser window if you don't have one.</p>
       <div class="actions">
         <a class="btn go" href="#get">Build from source</a>
         <a class="btn" href="https://github.com/goriparthi/pitwall">Follow on GitHub</a>
@@ -241,13 +241,13 @@ footer .fine { flex-basis: 100%; }
             <span class="pin" style="left:12.6%;top:9.5%">1</span>
             <span class="pin" style="left:44%;top:19.6%">2</span>
             <span class="pin" style="left:72%;top:19.6%">3</span>
-            <span class="pin" style="left:88%;top:80%">4</span>
-            <span class="pin" style="left:25.5%;top:93%">5</span>
+            <span class="pin" style="left:86%;top:86%">4</span>
+            <span class="pin" style="left:36%;top:93%">5</span>
           </div>
         </div>
         <span class="scroll-hint">Swipe sideways to see the whole screen.</span>
         <ol class="legend">
-          <li><b>Header</b>The layout and project you're looking at. When an agent needs you, it turns into an amber alert saying who is waiting, for what, and for how long.</li>
+          <li><b>Header</b>The layout and project you're looking at, and your plan's session and week usage if RedLine is installed. When an agent needs you, it turns into an amber alert saying who is waiting, for what, and for how long.</li>
           <li><b>Agents</b>One card per Claude Code session: status, time in that status, task title, latest tool, context size and output tokens.</li>
           <li><b>Computer</b>CPU with a 90 second trend, memory, network down and up, and free disk. GPU and battery sit in the label row.</li>
           <li><b>Launcher</b>Your shortcuts and their keys. The screen has no touch, so you run them from the menu bar or the desktop dashboard.</li>
@@ -300,13 +300,14 @@ footer .fine { flex-basis: 100%; }
               <li>The display's LED ring breathes amber.</li>
               <li>The menu bar shows <code>▲ 1</code>.</li>
             </ul>
-            <p>The AI usage template adds today's measured token totals and a row per running session. Ollama shows which models are loaded. Codex, Cursor and Claude Desktop are only detected as running, with no task detail.</p>
-            <p class="not-yet">Not yet: cost, and task detail for agents other than Claude Code.</p>
+            <p>If you use <a href="https://goriparthi.github.io/redline/">RedLine</a>, the AI desk template adds your Claude plan limits: how much of the 5 hour session and the week is left, when each resets, how fast you're using it, and whether that pace lasts until the reset. It also shows today's tokens and an estimated cost. Without RedLine, Pitwall leaves all of this out.</p>
+            <p>Ollama shows which models are loaded. Codex, Cursor and Claude Desktop are only detected as running, with no task detail.</p>
+            <p class="not-yet">Not yet: task detail for agents other than Claude Code.</p>
           </div>
         </div>
         <figure>
-          <img src="img/panel-agents.jpg" width="3840" height="960" alt="The Agents template: four agent cards, one waiting for approval, one working, one done, one idle" loading="lazy">
-          <figcaption>Agents template, demo data. The amber card is waiting for approval.</figcaption>
+          <img src="img/panel-ai-desk.jpg" width="3840" height="960" alt="The AI desk template: agent cards with one waiting for approval, two plan limit gauges for the session and the week with reset times and pace, and the launcher" loading="lazy">
+          <figcaption>AI desk template, demo data. The gauges show the session and week used; the white tick marks how much of each window has passed.</figcaption>
         </figure>
       </div>
     </div>
@@ -321,9 +322,9 @@ footer .fine { flex-basis: 100%; }
       </div>
       <div class="model">
         <dl class="terms">
-          <div><dt>Template</dt><dd>A named grid of up to four widgets. Six ship with Pitwall: <code>balanced</code>, <code>agents</code>, <code>focus</code>, <code>usage</code>, <code>system</code> and <code>monitor</code>. Write your own, or override a built-in by reusing its id.</dd></div>
-          <div><dt>Widget</dt><dd>One block of the screen: <code>ai</code>, <code>health</code>, <code>health-mini</code>, <code>launcher</code>, <code>usage</code> or <code>system</code>.</dd></div>
-          <div><dt>Data source</dt><dd>Where the numbers come from. Today these are built in: your computer's own counters, Claude Code's session files and hooks, and Ollama's local API. Sources you add yourself are planned.</dd></div>
+          <div><dt>Template</dt><dd>A named grid of up to four widgets. Seven ship with Pitwall: <code>balanced</code>, <code>ai-desk</code>, <code>agents</code>, <code>focus</code>, <code>usage</code>, <code>system</code> and <code>monitor</code>. Write your own, or override a built-in by reusing its id.</dd></div>
+          <div><dt>Widget</dt><dd>One block of the screen: <code>ai</code>, <code>limits</code>, <code>health</code>, <code>health-mini</code>, <code>launcher</code>, <code>usage</code> or <code>system</code>.</dd></div>
+          <div><dt>Data source</dt><dd>Where the numbers come from. Today these are built in: your computer's own counters, Claude Code's session files and hooks, and Ollama's local API. RedLine is optional: when it's installed, Pitwall reads its published usage files and plan limits appear; when it isn't, templates that need it are hidden. Sources you add yourself are planned.</dd></div>
           <div><dt>Action</dt><dd>A launcher entry: a terminal or app opened in the selected project, or a URL. Only actions listed in the file can run.</dd></div>
         </dl>
         <figure style="margin:0">
@@ -421,9 +422,10 @@ bin/pitwall open</pre></li>
         <div class="row" role="row"><span class="cat">Data</span><span>CPU, memory, disk, network, processes, battery</span><span class="st yes">Works</span><span class="note">macOS; the Windows versions are written but untested.</span></div>
         <div class="row" role="row"><span class="cat">Data</span><span>GPU and thermal state</span><span class="st part">macOS only</span><span class="note">Temperatures need root and aren't read.</span></div>
         <div class="row" role="row"><span class="cat">Data</span><span>Claude Code</span><span class="st yes">Works</span><span class="note">Status, approvals, failures and measured tokens.</span></div>
+        <div class="row" role="row"><span class="cat">Data</span><span>Claude plan limits and estimated cost</span><span class="st part">With RedLine</span><span class="note">Read from <a href="https://goriparthi.github.io/redline/">RedLine</a> when it's installed (macOS). Cost is RedLine's local estimate.</span></div>
         <div class="row" role="row"><span class="cat">Data</span><span>Ollama</span><span class="st yes">Works</span><span class="note">Which models are loaded.</span></div>
         <div class="row" role="row"><span class="cat">Data</span><span>Codex, Cursor, Claude Desktop</span><span class="st part">Detected only</span><span class="note">Shown as running; no task detail.</span></div>
-        <div class="row" role="row"><span class="cat">Planned</span><span>Service checks, cost, installers</span><span class="st plan">Planned</span><span class="note">Also on the list: Codex session detail and an option to start at login.</span></div>
+        <div class="row" role="row"><span class="cat">Planned</span><span>Service checks, installers</span><span class="st plan">Planned</span><span class="note">Also on the list: Codex session detail and an option to start at login.</span></div>
       </div>
     </div>
   </section>

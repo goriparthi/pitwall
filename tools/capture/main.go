@@ -29,7 +29,7 @@ var beats = []struct {
 	at   float64
 	page string
 }{
-	{10, "agents"},
+	{10, "ai-desk"},
 	{13, "usage"},
 	{15.5, "balanced"},
 }
